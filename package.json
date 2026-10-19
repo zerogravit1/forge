@@ -26,7 +26,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "npm run typecheck && npm run lint && npm run test && npm run build"
+    "check": "rm -rf dist/ && npm run typecheck && npm run lint && npm run test && npm run build"
   },
   "engines": {
     "node": ">=24.11.0"
