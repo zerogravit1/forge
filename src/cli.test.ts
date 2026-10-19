@@ -50,6 +50,26 @@ describe('main', () => {
     expect(stdout).toHaveBeenCalledWith('modified\tsrc/cli.ts\n');
   });
 
+  it('reports 1 detected change for a renamed file', async () => {
+    const getChanges = vi.fn(async () => [
+      {
+        status: 'renamed' as const,
+        path: 'src/new-file.ts',
+        previousPath: 'src/old-file.ts'
+      },
+    ]);
+
+    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    const exitCode = await main(['plan'], getChanges);
+
+    expect(exitCode).toBe(0);
+
+    expect(stdout).toHaveBeenCalledWith('Detected 1 changed files:\n');
+
+    expect(stdout).toHaveBeenCalledWith('renamed\tsrc/old-file.ts -> src/new-file.ts\n');
+  });
+
   it('returns an error when no command is provided', async () => {
     const getChanges = vi.fn(async () => []);
 
