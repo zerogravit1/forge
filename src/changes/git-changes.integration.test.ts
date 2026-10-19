@@ -1,4 +1,3 @@
-
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, writeFile, rename, rm } from 'node:fs/promises';
@@ -40,10 +39,7 @@ describe('getGitChanges integration', () => {
       await writeFile(join(repo, 'existing.ts'), 'version 2\n');
       await writeFile(join(repo, 'added.ts'), 'new file\n');
       await rm(join(repo, 'deleted.ts'));
-      await rename(
-        join(repo, 'old.ts'),
-        join(repo, 'renamed.ts'),
-      );
+      await rename(join(repo, 'old.ts'), join(repo, 'renamed.ts'));
 
       // Second commit.
       git(['add', '-A']);

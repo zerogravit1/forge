@@ -55,7 +55,7 @@ describe('main', () => {
       {
         status: 'renamed' as const,
         path: 'src/new-file.ts',
-        previousPath: 'src/old-file.ts'
+        previousPath: 'src/old-file.ts',
       },
     ]);
 
