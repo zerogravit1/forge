@@ -3,12 +3,8 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
-export type ChangeStatus =
-  | 'added'
-  | 'modified'
-  | 'deleted'
-  | 'renamed';
-  
+export type ChangeStatus = 'added' | 'modified' | 'deleted' | 'renamed';
+
 export interface GitChange {
   status: ChangeStatus;
   path: string;
@@ -22,16 +18,10 @@ export interface GitComparisonOptions {
   cwd?: string;
 }
 
-export type GitExecutor = (
-  args: string[],
-  cwd?: string,
-) => Promise<string>;
+export type GitExecutor = (args: string[], cwd?: string) => Promise<string>;
 
-async function captureGit(
-  args: string[],
-  cwd?: string,
-): Promise<string> {
-  const {stdout } = await execFileAsync('git', args, {
+async function captureGit(args: string[], cwd?: string): Promise<string> {
+  const { stdout } = await execFileAsync('git', args, {
     cwd,
     encoding: 'utf8',
     maxBuffer: 16 * 1024 * 1024,
@@ -46,37 +36,18 @@ export async function getGitChanges(
 ): Promise<GitChange[]> {
   const { from, to, mergeBase = false, cwd } = options;
 
-  if (
-    !from.trim() ||
-    !to.trim() ||
-    from.startsWith('-') ||
-    to.startsWith('-')
-  ) {
+  if (!from.trim() || !to.trim() || from.startsWith('-') || to.startsWith('-')) {
     throw new Error('Invalid Git revision');
   }
 
-  const revisions = mergeBase
-    ? [`${from}...${to}`]
-    : [from, to];
+  const revisions = mergeBase ? [`${from}...${to}`] : [from, to];
 
-  const output = await execute(
-    [
-      'diff',
-      '--name-status',
-      '-z',
-      '--find-renames',
-      ...revisions,
-      '--',
-    ],
-    cwd,
-  );
+  const output = await execute(['diff', '--name-status', '-z', '--find-renames', ...revisions, '--'], cwd);
 
   return parseGitChanges(output);
 }
 
-export function parseGitChanges(
-  output: string,
-): GitChange[] {
+export function parseGitChanges(output: string): GitChange[] {
   if (!output) {
     return [];
   }
@@ -132,15 +103,13 @@ export function parseGitChanges(
         changes.push({
           status: 'renamed',
           path,
-          previousPath
+          previousPath,
         });
         break;
       }
 
       default:
-        throw new Error(
-          `Unsupported Git change status: ${rawStatus}`,
-        );
+        throw new Error(`Unsupported Git change status: ${rawStatus}`);
     }
   }
 

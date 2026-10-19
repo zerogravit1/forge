@@ -1,10 +1,7 @@
 import { readCliOptions } from './config/cli-options.js';
 import { getGitChanges } from './changes/git-changes.js';
 
-export async function main(
-  args = process.argv.slice(2),
-  getChanges = getGitChanges,
-): Promise<number> {
+export async function main(args = process.argv.slice(2), getChanges = getGitChanges): Promise<number> {
   try {
     const options = readCliOptions(args);
 
@@ -17,18 +14,12 @@ export async function main(
           return 0;
         }
 
-        process.stdout.write(
-          `Detected ${changes.length} changed files:\n`,
-        );
+        process.stdout.write(`Detected ${changes.length} changed files:\n`);
 
         for (const change of changes) {
-          const path = change.previousPath
-            ? `${change.previousPath} -> ${change.path}`
-            : change.path;
+          const path = change.previousPath ? `${change.previousPath} -> ${change.path}` : change.path;
 
-          process.stdout.write(
-            `${change.status}\t${path}\n`,
-          );
+          process.stdout.write(`${change.status}\t${path}\n`);
         }
 
         return 0;

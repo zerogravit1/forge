@@ -3,10 +3,7 @@ import { getGitChanges, parseGitChanges } from './git-changes.js';
 
 describe('parseGitChanges', () => {
   it('parses added, modified and deleted files', () => {
-    const output =
-      'A\0src/new.ts\0' +
-      'M\0src/cli.ts\0' +
-      'D\0src/old.ts\0';
+    const output = 'A\0src/new.ts\0' + 'M\0src/cli.ts\0' + 'D\0src/old.ts\0';
 
     expect(parseGitChanges(output)).toEqual([
       { status: 'added', path: 'src/new.ts' },
@@ -22,7 +19,7 @@ describe('parseGitChanges', () => {
       {
         status: 'renamed',
         path: 'src/new.ts',
-        previousPath: 'src/old.ts'
+        previousPath: 'src/old.ts',
       },
     ]);
   });
@@ -34,29 +31,21 @@ describe('parseGitChanges', () => {
   it('preserves filesnames containing tabs', () => {
     const output = 'A\0src/a\tb.ts\0';
 
-    expect(parseGitChanges(output)).toEqual([
-      { status: 'added', path: 'src/a\tb.ts' },
-    ]);
+    expect(parseGitChanges(output)).toEqual([{ status: 'added', path: 'src/a\tb.ts' }]);
   });
 
   it('rejects unsupported Git statuses', () => {
-    expect(() =>
-      parseGitChanges('T\0src/file.ts\0'),
-    ).toThrow('Unsupported Git change status: T');
+    expect(() => parseGitChanges('T\0src/file.ts\0')).toThrow('Unsupported Git change status: T');
   });
 
   it('rejects incomplete output', () => {
-    expect(() =>
-      parseGitChanges('R100\0src/old.ts\0'),
-    ).toThrow('Malformed Git diff output');
+    expect(() => parseGitChanges('R100\0src/old.ts\0')).toThrow('Malformed Git diff output');
   });
 });
 
 describe('getGitChanges', () => {
   it('compares two revisions', async () => {
-    const execute = vi.fn(
-      async () => 'M\0src/cli.ts\0',
-    );
+    const execute = vi.fn(async () => 'M\0src/cli.ts\0');
 
     const changes = await getGitChanges(
       {
@@ -67,15 +56,7 @@ describe('getGitChanges', () => {
     );
 
     expect(execute).toHaveBeenCalledWith(
-      [
-        'diff',
-        '--name-status',
-        '-z',
-        '--find-renames',
-        'develop',
-        'feature/forge_cli',
-        '--',
-      ],
+      ['diff', '--name-status', '-z', '--find-renames', 'develop', 'feature/forge_cli', '--'],
       undefined,
     );
 
@@ -99,11 +80,6 @@ describe('getGitChanges', () => {
       execute,
     );
 
-    expect(execute).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        'develop...feature/forge_cli',
-      ]),
-      undefined,
-    );
+    expect(execute).toHaveBeenCalledWith(expect.arrayContaining(['develop...feature/forge_cli']), undefined);
   });
 });
