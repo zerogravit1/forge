@@ -65,7 +65,7 @@ describe('main', () => {
 
     expect(exitCode).toBe(0);
 
-    expect(stdout).toHaveBeenCalledWith('Detected 1 changed files:\n');
+    expect(stdout).toHaveBeenCalledWith('Detected 1 changed file:\n');
 
     expect(stdout).toHaveBeenCalledWith('renamed\tsrc/old-file.ts -> src/new-file.ts\n');
   });

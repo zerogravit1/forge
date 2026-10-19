@@ -14,7 +14,9 @@ export async function main(args = process.argv.slice(2), getChanges = getGitChan
           return 0;
         }
 
-        process.stdout.write(`Detected ${changes.length} changed files:\n`);
+        const fileLabel = changes.length === 1 ? 'file' : 'files';
+
+        process.stdout.write(`Detected ${changes.length} changed ${fileLabel}:\n`);
 
         for (const change of changes) {
           const path = change.previousPath ? `${change.previousPath} -> ${change.path}` : change.path;
