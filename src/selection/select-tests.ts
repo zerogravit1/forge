@@ -1,9 +1,5 @@
 import type { GitChange } from '../changes/git-changes.js';
-
-export interface TestDependency {
-  testFile: string;
-  dependencies: string[];
-}
+import type { TestDependency } from '../models/test-dependency.js';
 
 export interface SelectionResult {
   selectedTests: string[];
