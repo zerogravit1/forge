@@ -1,6 +1,6 @@
 import ts from 'typescript';
 import { readFile } from 'fs/promises';
-import { relative, resolve } from 'node:path';
+import { isAbsolute, relative, resolve, sep } from 'node:path';
 import type { TestDependency } from '../models/test-dependency.js';
 
 export interface ModuleImports {
@@ -34,9 +34,26 @@ export async function discoverModuleImports(file: string, repoRoot: string): Pro
   for (const statement of importStatements) {
     const resolvedPath = resolveImportPath(absolutePath, statement);
 
-    if (resolvedPath) {
-      resolvedImportPaths.push(resolvedPath);
+    if (!resolvedPath) {
+      continue;
     }
+
+    const relativePath = relative(repoRoot, resolvedPath);
+
+    const outsideRepo =
+      relativePath === '..' ||
+      relativePath.startsWith(`..${sep}`) ||
+      isAbsolute(relativePath);
+
+    const externalDependency = relativePath
+      .split(sep)
+      .includes('node_modules');
+
+    if (outsideRepo || externalDependency) {
+      continue;
+    }
+
+    resolvedImportPaths.push(resolvedPath);
   }
 
   const relativeImportPaths = resolvedImportPaths.map((path) => relative(repoRoot, path));

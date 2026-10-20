@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   discoverImports,
+  discoverModuleImports,
   resolveImportPath,
   resolveTestDependencies,
   type ModuleImports,
@@ -121,5 +122,27 @@ describe('resolveImportPath', () => {
     const result = resolveImportPath('src/cli.test.ts', './does-not-exist.js');
 
     expect(result).toBeUndefined();
+  });
+});
+
+describe('discoverModuleImports', () => {
+  it('discovers module imports from an actual source file', async () => {
+    const result = await discoverModuleImports('src/cli.test.ts', process.cwd());
+
+    expect(result.file).toBe('src/cli.test.ts');
+    expect(result.imports).toContain('src/cli.ts');
+  });
+
+  it('excludes dependencies from node_modules', async () => {
+    const result = await discoverModuleImports(
+      'src/cli.test.ts',
+      process.cwd(),
+    );
+
+    expect(result.imports).not.toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('node_modules'),
+      ]),
+    );
   });
 });

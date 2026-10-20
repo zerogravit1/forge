@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { main } from './cli.js';
-import { discoverModuleImports } from './discovery/vitest-dependencies.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -124,12 +123,5 @@ describe('main', () => {
     expect(getChanges).not.toHaveBeenCalled();
 
     expect(stderr).toHaveBeenCalledWith('Run is not implemented yet');
-  });
-
-  it('discovers module imports from an actual source file', async () => {
-    const result = await discoverModuleImports('src/cli.test.ts', process.cwd());
-
-    expect(result.file).toBe('src/cli.test.ts');
-    expect(result.imports).toContain('src/cli.ts');
-  });
+  });  
 });
