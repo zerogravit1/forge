@@ -1,4 +1,6 @@
 import ts from 'typescript';
+import { readFile } from 'fs/promises';
+import { relative, resolve } from 'node:path';
 import type { TestDependency } from '../models/test-dependency.js';
 
 export interface ModuleImports {
@@ -24,6 +26,37 @@ export function discoverImports(source: string): string[] {
     .map((specifier) => specifier.text);
 
   return dependencies;
+}
+
+export async function discoverModuleImports(
+  file: string,
+  repoRoot: string,
+): Promise<ModuleImports> {
+  const absolutePath = resolve(repoRoot, file);
+  const source = await readFile(absolutePath, 'utf8');
+
+  const importStatements = discoverImports(source);
+
+  const resolvedImportPaths: string[] = [];
+
+  for (const statement of importStatements) {
+    const resolvedPath = resolveImportPath(absolutePath, statement);
+
+    if (resolvedPath) {
+      resolvedImportPaths.push(resolvedPath);
+    }
+  }
+
+  const relativeImportPaths = resolvedImportPaths.map(
+    (path) => relative(repoRoot, path)
+  );
+
+  const relativeFilePath = relative(repoRoot, absolutePath);
+
+  return {
+    file: relativeFilePath,
+    imports: relativeImportPaths
+  };
 }
 
 export function resolveImportPath(importingFile: string, importSpecifier: string): string | undefined {
