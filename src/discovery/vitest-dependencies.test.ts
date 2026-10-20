@@ -21,14 +21,24 @@ const modules: ModuleImports[] = [
 describe('discoverImports', () => {
   it('returns the imports declared in a source file', () => {
     const source = `
-    import { calculatorOrder } from './order-service.js';
-    import { validateOrder } from './order-validator.js';
+      import { calculatorOrder } from './order-service.js';
+      import { validateOrder } from './order-validator.js';
     `;
 
     expect(discoverImports(source)).toEqual([
       './order-service.js',
       './order-validator.js'
     ]);
+  });
+
+  it('returns no dependencies when the source contains no imports', () => {
+    const source = `
+      export function calculateOrder(quantity: number, price: number) {
+        return quantity * price;
+      }
+    `;
+
+    expect(discoverImports(source)).toEqual([]);
   });
 });
 
@@ -64,6 +74,39 @@ describe('resolveTestDependencies', () => {
         testFile: 'src/orders/order-service.test.ts'
       }]
     );
+  });
+
+  it('returns dependencies for multiple tests importing the same module', () => {
+    const testFiles = [
+      'src/orders/order-service.test.ts',
+      'src/orders/order-controller.test.ts',
+    ];
+
+    const modules: ModuleImports[] = [
+      {
+        file: 'src/orders/order-service.test.ts',
+        imports: ['src/orders/order-service.ts'],
+      },
+      {
+        file: 'src/orders/order-controller.test.ts',
+        imports: ['src/orders/order-service.ts'],
+      },
+      {
+        file: 'src/orders/order-service.ts',
+        imports: [],
+      },
+    ];
+
+    expect(resolveTestDependencies(testFiles, modules)).toEqual([
+      {
+        testFile: 'src/orders/order-service.test.ts',
+        dependencies: ['src/orders/order-service.ts'],
+      },
+      {
+        testFile: 'src/orders/order-controller.test.ts',
+        dependencies: ['src/orders/order-service.ts']
+      },
+    ]);
   });
 });
 

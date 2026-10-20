@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { selectTests, type TestDependency } from './select-tests.js';
+import { selectTests } from './select-tests.js';
+import type { TestDependency } from '../models/test-dependency.js';
 import type { GitChange } from '../changes/git-changes.js';
 
 const changedFiles: GitChange[] = [{ status: 'modified', path: 'src/orders/order-service.ts' }];
@@ -64,6 +65,20 @@ describe('selectTests', () => {
           status: 'modified',
           path: 'src/orders/untested-service.ts',
         },
+      ],
+    });
+  });
+
+  it('reports unmapped changes alongside selected tests', () => {
+    const changes: GitChange[] = [
+      { status: 'modified', path: 'src/orders/order-service.ts' },
+      { status: 'added', path: 'src/orders/inventory-service.ts' },
+    ];
+
+    expect(selectTests(changes, testDependencies)).toEqual({
+      selectedTests: ['src/orders/order-service.test.ts'],
+      unmappedChanges: [
+        { status: 'added', path: 'src/orders/inventory-service.ts' }
       ],
     });
   });
