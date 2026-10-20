@@ -5,17 +5,30 @@ export interface TestDependency {
   dependencies: string[];
 }
 
-export function selectTests(
-  changedFiles: GitChange[],
-  testDependencies: TestDependency[],
-): string[] {
+export interface SelectionResult {
+  selectedTests: string[];
+  unmappedChanges: GitChange[];
+}
+
+export function selectTests(changedFiles: GitChange[], testDependencies: TestDependency[]): SelectionResult {
   const testFiles = testDependencies
     .filter((testDependency) =>
-      changedFiles.some((change) =>
-        testDependency.dependencies.includes(change.path),
+      changedFiles.some(
+        (change) => testDependency.testFile === change.path || testDependency.dependencies.includes(change.path),
       ),
     )
     .map((testDependency) => testDependency.testFile);
 
-  return testFiles;
+  const unmappedChanges = changedFiles.filter(
+    (change) =>
+      !testDependencies.some(
+        (testDependency) =>
+          testDependency.testFile === change.path || testDependency.dependencies.includes(change.path),
+      ),
+  );
+
+  return {
+    selectedTests: testFiles,
+    unmappedChanges,
+  };
 }
