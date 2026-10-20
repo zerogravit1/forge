@@ -77,9 +77,7 @@ describe('selectTests', () => {
 
     expect(selectTests(changes, testDependencies)).toEqual({
       selectedTests: ['src/orders/order-service.test.ts'],
-      unmappedChanges: [
-        { status: 'added', path: 'src/orders/inventory-service.ts' }
-      ],
+      unmappedChanges: [{ status: 'added', path: 'src/orders/inventory-service.ts' }],
     });
   });
 });

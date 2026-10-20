@@ -127,10 +127,7 @@ describe('main', () => {
   });
 
   it('discovers module imports from an actual source file', async () => {
-    const result = await discoverModuleImports(
-      'src/cli.test.ts',
-      process.cwd()
-    );
+    const result = await discoverModuleImports('src/cli.test.ts', process.cwd());
 
     expect(result.file).toBe('src/cli.test.ts');
     expect(result.imports).toContain('src/cli.ts');

@@ -9,17 +9,12 @@ export interface ModuleImports {
 }
 
 export function discoverImports(source: string): string[] {
-  const parsed = ts.createSourceFile(
-    'example.ts',
-    source,
-    ts.ScriptTarget.Latest,
-    true
-  );
+  const parsed = ts.createSourceFile('example.ts', source, ts.ScriptTarget.Latest, true);
 
   const statements = parsed.statements;
 
-  const imports = statements.filter(ts.isImportDeclaration)
-  
+  const imports = statements.filter(ts.isImportDeclaration);
+
   const dependencies = imports
     .map((statement) => statement.moduleSpecifier)
     .filter(ts.isStringLiteral)
@@ -28,10 +23,7 @@ export function discoverImports(source: string): string[] {
   return dependencies;
 }
 
-export async function discoverModuleImports(
-  file: string,
-  repoRoot: string,
-): Promise<ModuleImports> {
+export async function discoverModuleImports(file: string, repoRoot: string): Promise<ModuleImports> {
   const absolutePath = resolve(repoRoot, file);
   const source = await readFile(absolutePath, 'utf8');
 
@@ -47,15 +39,13 @@ export async function discoverModuleImports(
     }
   }
 
-  const relativeImportPaths = resolvedImportPaths.map(
-    (path) => relative(repoRoot, path)
-  );
+  const relativeImportPaths = resolvedImportPaths.map((path) => relative(repoRoot, path));
 
   const relativeFilePath = relative(repoRoot, absolutePath);
 
   return {
     file: relativeFilePath,
-    imports: relativeImportPaths
+    imports: relativeImportPaths,
   };
 }
 
@@ -63,26 +53,16 @@ export function resolveImportPath(importingFile: string, importSpecifier: string
   const compilerOptions: ts.CompilerOptions = {
     module: ts.ModuleKind.NodeNext,
     moduleResolution: ts.ModuleResolutionKind.NodeNext,
-    target: ts.ScriptTarget.ES2022
-  }
+    target: ts.ScriptTarget.ES2022,
+  };
 
-  const result = ts.resolveModuleName(
-    importSpecifier,
-    importingFile,
-    compilerOptions,
-    ts.sys,
-  );
+  const result = ts.resolveModuleName(importSpecifier, importingFile, compilerOptions, ts.sys);
 
   return result.resolvedModule?.resolvedFileName;
 }
 
-export function resolveTestDependencies(
-  testFiles: string[],
-  modules: ModuleImports[]
-): TestDependency[] {
-  const importsByFile = new Map(
-    modules.map((module) => [module.file, module.imports]),
-  );
+export function resolveTestDependencies(testFiles: string[], modules: ModuleImports[]): TestDependency[] {
+  const importsByFile = new Map(modules.map((module) => [module.file, module.imports]));
 
   return testFiles.map((testFile) => {
     const visited = new Set<string>();

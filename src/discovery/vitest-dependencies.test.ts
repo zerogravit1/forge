@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { discoverImports, resolveImportPath, resolveTestDependencies, type ModuleImports } from './vitest-dependencies.js';
+import {
+  discoverImports,
+  resolveImportPath,
+  resolveTestDependencies,
+  type ModuleImports,
+} from './vitest-dependencies.js';
 
 const testFiles = ['src/orders/order-service.test.ts'];
 
@@ -25,10 +30,7 @@ describe('discoverImports', () => {
       import { validateOrder } from './order-validator.js';
     `;
 
-    expect(discoverImports(source)).toEqual([
-      './order-service.js',
-      './order-validator.js'
-    ]);
+    expect(discoverImports(source)).toEqual(['./order-service.js', './order-validator.js']);
   });
 
   it('returns no dependencies when the source contains no imports', () => {
@@ -44,12 +46,12 @@ describe('discoverImports', () => {
 
 describe('resolveTestDependencies', () => {
   it('returns a test file and dependencies', () => {
-    expect(resolveTestDependencies(testFiles, modules)).toEqual(
-      [{
+    expect(resolveTestDependencies(testFiles, modules)).toEqual([
+      {
         dependencies: ['src/orders/order-service.ts', 'src/orders/order-validator.ts'],
-        testFile: 'src/orders/order-service.test.ts'
-      }]
-    );
+        testFile: 'src/orders/order-service.test.ts',
+      },
+    ]);
   });
 
   it('resolves circular dependencies without duplicate files', () => {
@@ -68,19 +70,16 @@ describe('resolveTestDependencies', () => {
       },
     ];
 
-    expect(resolveTestDependencies(testFiles, modules)).toEqual(
-      [{
+    expect(resolveTestDependencies(testFiles, modules)).toEqual([
+      {
         dependencies: ['src/orders/order-service.ts', 'src/orders/order-validator.ts'],
-        testFile: 'src/orders/order-service.test.ts'
-      }]
-    );
+        testFile: 'src/orders/order-service.test.ts',
+      },
+    ]);
   });
 
   it('returns dependencies for multiple tests importing the same module', () => {
-    const testFiles = [
-      'src/orders/order-service.test.ts',
-      'src/orders/order-controller.test.ts',
-    ];
+    const testFiles = ['src/orders/order-service.test.ts', 'src/orders/order-controller.test.ts'];
 
     const modules: ModuleImports[] = [
       {
@@ -104,7 +103,7 @@ describe('resolveTestDependencies', () => {
       },
       {
         testFile: 'src/orders/order-controller.test.ts',
-        dependencies: ['src/orders/order-service.ts']
+        dependencies: ['src/orders/order-service.ts'],
       },
     ]);
   });
@@ -112,20 +111,14 @@ describe('resolveTestDependencies', () => {
 
 describe('resolveImportPath', () => {
   it('resolves a JavaScript import to its TypeScript source file', () => {
-    const result = resolveImportPath(
-      'src/cli.test.ts',
-      './cli.js'
-    );
+    const result = resolveImportPath('src/cli.test.ts', './cli.js');
 
     expect(result).toBeDefined();
     expect(result).toMatch(/src[/\\]cli\.ts$/);
   });
 
   it('returns undefined when an imported module cannot be resolved', () => {
-    const result = resolveImportPath(
-      'src/cli.test.ts',
-      './does-not-exist.js'
-    );
+    const result = resolveImportPath('src/cli.test.ts', './does-not-exist.js');
 
     expect(result).toBeUndefined();
   });
