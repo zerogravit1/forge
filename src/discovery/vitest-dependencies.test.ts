@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   discoverImports,
   discoverModuleImports,
+  discoverRepositoryModules,
   resolveImportPath,
   resolveTestDependencies,
   type ModuleImports,
@@ -42,6 +43,15 @@ describe('discoverImports', () => {
     `;
 
     expect(discoverImports(source)).toEqual([]);
+  });
+
+  it('discovers modules referenced by re-exports', () => {
+    const source = `
+      export { calculateOrder } from './order-service.js';
+      export * from './order-validator.js';
+    `;
+
+    expect(discoverImports(source)).toEqual(['./order-service.js', './order-validator.js']);
   });
 });
 
@@ -134,14 +144,26 @@ describe('discoverModuleImports', () => {
   });
 
   it('excludes dependencies from node_modules', async () => {
-    const result = await discoverModuleImports(
-      'src/cli.test.ts',
-      process.cwd(),
-    );
+    const result = await discoverModuleImports('src/cli.test.ts', process.cwd());
 
-    expect(result.imports).not.toEqual(
+    expect(result.imports).not.toEqual(expect.arrayContaining([expect.stringContaining('node_modules')]));
+  });
+});
+
+describe('discoverRepositoryModules', () => {
+  it('discovers indirect dependencies from source files', async () => {
+    const modules = await discoverRepositoryModules(['src/cli.test.ts'], process.cwd());
+
+    expect(modules).toEqual(
       expect.arrayContaining([
-        expect.stringContaining('node_modules'),
+        {
+          file: 'src/cli.test.ts',
+          imports: expect.arrayContaining(['src/cli.ts']),
+        },
+        {
+          file: 'src/cli.ts',
+          imports: expect.arrayContaining(['src/config/cli-options.ts', 'src/changes/git-changes.ts']),
+        },
       ]),
     );
   });

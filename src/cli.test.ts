@@ -123,5 +123,5 @@ describe('main', () => {
     expect(getChanges).not.toHaveBeenCalled();
 
     expect(stderr).toHaveBeenCalledWith('Run is not implemented yet');
-  });  
+  });
 });

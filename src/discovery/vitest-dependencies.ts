@@ -14,13 +14,20 @@ export function discoverImports(source: string): string[] {
   const statements = parsed.statements;
 
   const imports = statements.filter(ts.isImportDeclaration);
+  const exports = statements.filter(ts.isExportDeclaration);
 
   const dependencies = imports
     .map((statement) => statement.moduleSpecifier)
     .filter(ts.isStringLiteral)
     .map((specifier) => specifier.text);
 
-  return dependencies;
+  const exportDependencies = exports
+    .map((statement) => statement.moduleSpecifier)
+    .filter((specifier) => specifier !== undefined)
+    .filter(ts.isStringLiteral)
+    .map((specifier) => specifier.text);
+
+  return [...dependencies, ...exportDependencies];
 }
 
 export async function discoverModuleImports(file: string, repoRoot: string): Promise<ModuleImports> {
@@ -40,14 +47,9 @@ export async function discoverModuleImports(file: string, repoRoot: string): Pro
 
     const relativePath = relative(repoRoot, resolvedPath);
 
-    const outsideRepo =
-      relativePath === '..' ||
-      relativePath.startsWith(`..${sep}`) ||
-      isAbsolute(relativePath);
+    const outsideRepo = relativePath === '..' || relativePath.startsWith(`..${sep}`) || isAbsolute(relativePath);
 
-    const externalDependency = relativePath
-      .split(sep)
-      .includes('node_modules');
+    const externalDependency = relativePath.split(sep).includes('node_modules');
 
     if (outsideRepo || externalDependency) {
       continue;
@@ -64,6 +66,33 @@ export async function discoverModuleImports(file: string, repoRoot: string): Pro
     file: relativeFilePath,
     imports: relativeImportPaths,
   };
+}
+
+export async function discoverRepositoryModules(testFiles: string[], repoRoot: string): Promise<ModuleImports[]> {
+  const visited = new Set<string>();
+  const modules: ModuleImports[] = [];
+
+  async function visit(file: string): Promise<void> {
+    if (visited.has(file)) {
+      return;
+    }
+
+    visited.add(file);
+
+    const moduleImports = await discoverModuleImports(file, repoRoot);
+
+    modules.push(moduleImports);
+
+    for (const dependency of moduleImports.imports) {
+      await visit(dependency);
+    }
+  }
+
+  for (const testFile of testFiles) {
+    await visit(testFile);
+  }
+
+  return modules;
 }
 
 export function resolveImportPath(importingFile: string, importSpecifier: string): string | undefined {
