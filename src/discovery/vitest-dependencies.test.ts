@@ -7,6 +7,9 @@ import {
   resolveTestDependencies,
   type ModuleImports,
 } from './vitest-dependencies.js';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 const testFiles = ['src/orders/order-service.test.ts'];
 
@@ -118,6 +121,35 @@ describe('resolveTestDependencies', () => {
       },
     ]);
   });
+
+  it('propagates unresolved imports from indirect dependencies', () => {
+    const modules = [
+      {
+        file: 'src/example.test.ts',
+        imports: ['src/service.ts'],
+      },
+      {
+        file: 'src/service.ts',
+        imports: [],
+        unresolvedImports: ['./missing.js'],
+      },
+    ];
+
+    const result = resolveTestDependencies(
+      ['src/example.test.ts'],
+      modules,
+    );
+
+    expect(result[0]).toMatchObject({
+      testFile: 'src/example.test.ts',
+      unresolvedImports: [
+        {
+          file: 'src/service.ts',
+          specifier: './missing.js',
+        },
+      ],
+    });
+  });
 });
 
 describe('resolveImportPath', () => {
@@ -147,6 +179,32 @@ describe('discoverModuleImports', () => {
     const result = await discoverModuleImports('src/cli.test.ts', process.cwd());
 
     expect(result.imports).not.toEqual(expect.arrayContaining([expect.stringContaining('node_modules')]));
+  });
+
+  it('reports unresolved local imports', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'forge-test-'));
+
+    try {
+      await mkdir(join(repoRoot, 'src'));
+
+      await writeFile(
+        join(repoRoot, 'src/example.test.ts'),
+        `import { missingFunction } from './missing.js';`
+      );
+
+      const result = await discoverModuleImports(
+        'src/example.test.ts',
+        repoRoot
+      );
+
+      expect(result).toEqual({
+        file: 'src/example.test.ts',
+        imports: [],
+        unresolvedImports: ['./missing.js'],
+      });
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
   });
 });
 
