@@ -10,8 +10,8 @@ interface CliServices {
 
 const defaultServices: CliServices = {
   discoverTestFiles: discoverVitestTestFiles,
-  planSelection: planTestSelection
-}
+  planSelection: planTestSelection,
+};
 
 export async function main(
   args = process.argv.slice(2),
@@ -34,11 +34,7 @@ export async function main(
 
         const testFiles = await services.discoverTestFiles(repoRoot);
 
-        const selection = await services.planSelection(
-          changes,
-          testFiles,
-          repoRoot,
-        );
+        const selection = await services.planSelection(changes, testFiles, repoRoot);
 
         const fileLabel = changes.length === 1 ? 'file' : 'files';
 

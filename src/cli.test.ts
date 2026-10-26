@@ -6,15 +6,11 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-const discoverTestFiles = vi.fn(async () => [
-  'src/cli.test.ts'
-]);
+const discoverTestFiles = vi.fn(async () => ['src/cli.test.ts']);
 
 const planSelection = vi.fn(async () => ({
   selectedTests: ['src/cli.test.ts'],
-  unmappedChanges: [
-    { status: 'added' as const, path: 'src/new-file.ts'}
-  ]
+  unmappedChanges: [{ status: 'added' as const, path: 'src/new-file.ts' }],
 }));
 
 describe('main', () => {
@@ -23,7 +19,10 @@ describe('main', () => {
 
     const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
-    const exitCode = await main(['plan', '--from', 'develop', '--to', 'feature/forge_cli'], getChanges);
+    const exitCode = await main(['plan', '--from', 'develop', '--to', 'feature/forge_cli'], getChanges, {
+      discoverTestFiles,
+      planSelection,
+    });
 
     expect(exitCode).toBe(0);
 
@@ -73,9 +72,7 @@ describe('main', () => {
     expect(discoverTestFiles).toHaveBeenCalledWith(process.cwd());
 
     expect(planSelection).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        { status: 'modified', path: 'src/cli.ts' },
-      ]),
+      expect.arrayContaining([{ status: 'modified', path: 'src/cli.ts' }]),
       ['src/cli.test.ts'],
       process.cwd(),
     );
@@ -94,7 +91,7 @@ describe('main', () => {
 
     const exitCode = await main(['plan'], getChanges, {
       discoverTestFiles,
-      planSelection
+      planSelection,
     });
 
     expect(exitCode).toBe(0);
@@ -171,9 +168,7 @@ describe('main', () => {
       },
     ]);
 
-    const discoverTestFiles = vi
-      .fn()
-      .mockRejectedValue(new Error('Vitest discovery failed'))
+    const discoverTestFiles = vi.fn().mockRejectedValue(new Error('Vitest discovery failed'));
 
     const stderr = vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -185,5 +180,7 @@ describe('main', () => {
     expect(exitCode).toBe(1);
 
     expect(stderr).toHaveBeenCalledWith('Vitest discovery failed');
+
+    expect(planSelection).not.toHaveBeenCalled();
   });
 });
