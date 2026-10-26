@@ -3,6 +3,7 @@ import { main } from './cli.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.clearAllMocks();
 });
 
 const discoverTestFiles = vi.fn(async () => [
@@ -34,6 +35,9 @@ describe('main', () => {
     });
 
     expect(stdout).toHaveBeenCalledWith('No changes detected.\n');
+
+    expect(discoverTestFiles).not.toHaveBeenCalled();
+    expect(planSelection).not.toHaveBeenCalled();
   });
 
   it('reports detected changes', async () => {
@@ -153,5 +157,33 @@ describe('main', () => {
     expect(getChanges).not.toHaveBeenCalled();
 
     expect(stderr).toHaveBeenCalledWith('Run is not implemented yet');
+  });
+
+  it('returns an error when discoverTestFiles fail', async () => {
+    const getChanges = vi.fn(async () => [
+      {
+        status: 'added' as const,
+        path: 'src/new-file.ts',
+      },
+      {
+        status: 'modified' as const,
+        path: 'src/cli.ts',
+      },
+    ]);
+
+    const discoverTestFiles = vi
+      .fn()
+      .mockRejectedValue(new Error('Vitest discovery failed'))
+
+    const stderr = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const exitCode = await main(['plan'], getChanges, {
+      discoverTestFiles,
+      planSelection,
+    });
+
+    expect(exitCode).toBe(1);
+
+    expect(stderr).toHaveBeenCalledWith('Vitest discovery failed');
   });
 });
