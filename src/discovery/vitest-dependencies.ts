@@ -138,8 +138,8 @@ export function resolveTestDependencies(testFiles: string[], modules: ModuleImpo
       for (const specifier of module?.unresolvedImports ?? []) {
         unresolvedImports.push({
           file,
-          specifier
-        })
+          specifier,
+        });
       }
     }
 

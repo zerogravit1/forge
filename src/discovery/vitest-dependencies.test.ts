@@ -135,10 +135,7 @@ describe('resolveTestDependencies', () => {
       },
     ];
 
-    const result = resolveTestDependencies(
-      ['src/example.test.ts'],
-      modules,
-    );
+    const result = resolveTestDependencies(['src/example.test.ts'], modules);
 
     expect(result[0]).toMatchObject({
       testFile: 'src/example.test.ts',
@@ -187,15 +184,9 @@ describe('discoverModuleImports', () => {
     try {
       await mkdir(join(repoRoot, 'src'));
 
-      await writeFile(
-        join(repoRoot, 'src/example.test.ts'),
-        `import { missingFunction } from './missing.js';`
-      );
+      await writeFile(join(repoRoot, 'src/example.test.ts'), `import { missingFunction } from './missing.js';`);
 
-      const result = await discoverModuleImports(
-        'src/example.test.ts',
-        repoRoot
-      );
+      const result = await discoverModuleImports('src/example.test.ts', repoRoot);
 
       expect(result).toEqual({
         file: 'src/example.test.ts',
