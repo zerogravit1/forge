@@ -6,7 +6,7 @@ afterEach(() => {
 });
 
 const discoverTestFiles = vi.fn(async () => [
-  'src/cli.test'
+  'src/cli.test.ts'
 ]);
 
 const planSelection = vi.fn(async () => ({
@@ -65,6 +65,16 @@ describe('main', () => {
 
     expect(stdout).toHaveBeenCalledWith('\nUnmapped changes:\n');
     expect(stdout).toHaveBeenCalledWith('  added\tsrc/new-file.ts\n');
+
+    expect(discoverTestFiles).toHaveBeenCalledWith(process.cwd());
+
+    expect(planSelection).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        { status: 'modified', path: 'src/cli.ts' },
+      ]),
+      ['src/cli.test.ts'],
+      process.cwd(),
+    );
   });
 
   it('reports 1 detected change for a renamed file', async () => {
@@ -78,7 +88,10 @@ describe('main', () => {
 
     const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
-    const exitCode = await main(['plan'], getChanges);
+    const exitCode = await main(['plan'], getChanges, {
+      discoverTestFiles,
+      planSelection
+    });
 
     expect(exitCode).toBe(0);
 
