@@ -80,4 +80,28 @@ describe('selectTests', () => {
       unmappedChanges: [{ status: 'added', path: 'src/orders/inventory-service.ts' }],
     });
   });
+
+  it('selects test with unresolved dependencies as a precaution', () => {
+    const changes: GitChange[] = [
+      { status: 'modified', path: 'src/orders/another-service.ts' },
+    ];
+
+    const dependencies: TestDependency[] = [
+      {
+        testFile: 'src/orders/order-service.test.ts',
+        dependencies: ['src/orders/order-service.ts'],
+        unresolvedImports: [
+          {
+            file: 'src/orders/order-service.ts',
+            specifier: './missing.js',
+          },
+        ],
+      },
+    ];
+
+    expect(selectTests(changes, dependencies)).toEqual({
+      selectedTests: ['src/orders/order-service.test.ts'],
+      unmappedChanges: [{ status: 'modified', path: 'src/orders/another-service.ts' }],
+    });
+  });
 });
