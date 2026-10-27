@@ -82,9 +82,7 @@ describe('selectTests', () => {
   });
 
   it('selects test with unresolved dependencies as a precaution', () => {
-    const changes: GitChange[] = [
-      { status: 'modified', path: 'src/orders/another-service.ts' },
-    ];
+    const changes: GitChange[] = [{ status: 'modified', path: 'src/orders/another-service.ts' }];
 
     const dependencies: TestDependency[] = [
       {

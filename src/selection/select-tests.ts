@@ -10,14 +10,10 @@ export function selectTests(changedFiles: GitChange[], testDependencies: TestDep
   const testFiles = testDependencies
     .filter((testDependency) => {
       const knownImpact = changedFiles.some(
-        (change) =>
-          testDependency.testFile === change.path ||
-          testDependency.dependencies.includes(change.path),
+        (change) => testDependency.testFile === change.path || testDependency.dependencies.includes(change.path),
       );
 
-      const uncertainImpact =
-        changedFiles.length > 0 &&
-        (testDependency.unresolvedImports?.length ?? 0) > 0;
+      const uncertainImpact = changedFiles.length > 0 && (testDependency.unresolvedImports?.length ?? 0) > 0;
 
       return knownImpact || uncertainImpact;
     })
