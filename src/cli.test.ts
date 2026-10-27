@@ -3,7 +3,15 @@ import { main } from './cli.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.clearAllMocks();
 });
+
+const discoverTestFiles = vi.fn(async () => ['src/cli.test.ts']);
+
+const planSelection = vi.fn(async () => ({
+  selectedTests: ['src/cli.test.ts'],
+  unmappedChanges: [{ status: 'added' as const, path: 'src/new-file.ts' }],
+}));
 
 describe('main', () => {
   it('reports when no changes are detected', async () => {
@@ -11,7 +19,10 @@ describe('main', () => {
 
     const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
-    const exitCode = await main(['plan', '--from', 'develop', '--to', 'feature/forge_cli'], getChanges);
+    const exitCode = await main(['plan', '--from', 'develop', '--to', 'feature/forge_cli'], getChanges, {
+      discoverTestFiles,
+      planSelection,
+    });
 
     expect(exitCode).toBe(0);
 
@@ -23,6 +34,9 @@ describe('main', () => {
     });
 
     expect(stdout).toHaveBeenCalledWith('No changes detected.\n');
+
+    expect(discoverTestFiles).not.toHaveBeenCalled();
+    expect(planSelection).not.toHaveBeenCalled();
   });
 
   it('reports detected changes', async () => {
@@ -39,15 +53,29 @@ describe('main', () => {
 
     const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
-    const exitCode = await main(['plan'], getChanges);
+    const exitCode = await main(['plan'], getChanges, {
+      discoverTestFiles,
+      planSelection,
+    });
 
     expect(exitCode).toBe(0);
 
     expect(stdout).toHaveBeenCalledWith('Detected 2 changed files:\n');
-
     expect(stdout).toHaveBeenCalledWith('added\tsrc/new-file.ts\n');
-
     expect(stdout).toHaveBeenCalledWith('modified\tsrc/cli.ts\n');
+    expect(stdout).toHaveBeenCalledWith('\nSelected tests:\n');
+    expect(stdout).toHaveBeenCalledWith('  src/cli.test.ts\n');
+
+    expect(stdout).toHaveBeenCalledWith('\nUnmapped changes:\n');
+    expect(stdout).toHaveBeenCalledWith('  added\tsrc/new-file.ts\n');
+
+    expect(discoverTestFiles).toHaveBeenCalledWith(process.cwd());
+
+    expect(planSelection).toHaveBeenCalledWith(
+      expect.arrayContaining([{ status: 'modified', path: 'src/cli.ts' }]),
+      ['src/cli.test.ts'],
+      process.cwd(),
+    );
   });
 
   it('reports 1 detected change for a renamed file', async () => {
@@ -61,7 +89,10 @@ describe('main', () => {
 
     const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
-    const exitCode = await main(['plan'], getChanges);
+    const exitCode = await main(['plan'], getChanges, {
+      discoverTestFiles,
+      planSelection,
+    });
 
     expect(exitCode).toBe(0);
 
@@ -123,5 +154,33 @@ describe('main', () => {
     expect(getChanges).not.toHaveBeenCalled();
 
     expect(stderr).toHaveBeenCalledWith('Run is not implemented yet');
+  });
+
+  it('returns an error when discoverTestFiles fail', async () => {
+    const getChanges = vi.fn(async () => [
+      {
+        status: 'added' as const,
+        path: 'src/new-file.ts',
+      },
+      {
+        status: 'modified' as const,
+        path: 'src/cli.ts',
+      },
+    ]);
+
+    const discoverTestFiles = vi.fn().mockRejectedValue(new Error('Vitest discovery failed'));
+
+    const stderr = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const exitCode = await main(['plan'], getChanges, {
+      discoverTestFiles,
+      planSelection,
+    });
+
+    expect(exitCode).toBe(1);
+
+    expect(stderr).toHaveBeenCalledWith('Vitest discovery failed');
+
+    expect(planSelection).not.toHaveBeenCalled();
   });
 });
