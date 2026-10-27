@@ -10,7 +10,7 @@ export function resolveTestDependencies(testFiles: string[], modules: ModuleDepe
 
     function visit(file: string): void {
       const module = modulesByFile.get(file);
-      const imports = module?.imports ?? [];
+      const imports = module?.dependencies ?? [];
 
       for (const dependency of imports) {
         if (dependency === testFile || visited.has(dependency)) {
@@ -21,7 +21,7 @@ export function resolveTestDependencies(testFiles: string[], modules: ModuleDepe
         visit(dependency);
       }
 
-      for (const specifier of module?.unresolvedImports ?? []) {
+      for (const specifier of module?.unresolvedDependencies ?? []) {
         unresolvedImports.push({
           file,
           specifier,

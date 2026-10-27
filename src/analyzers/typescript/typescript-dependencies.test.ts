@@ -61,13 +61,13 @@ describe('discoverModuleImports', () => {
     const result = await discoverModuleImports('src/cli.test.ts', process.cwd());
 
     expect(result.file).toBe('src/cli.test.ts');
-    expect(result.imports).toContain('src/cli.ts');
+    expect(result.dependencies).toContain('src/cli.ts');
   });
 
   it('excludes dependencies from node_modules', async () => {
     const result = await discoverModuleImports('src/cli.test.ts', process.cwd());
 
-    expect(result.imports).not.toEqual(expect.arrayContaining([expect.stringContaining('node_modules')]));
+    expect(result.dependencies).not.toEqual(expect.arrayContaining([expect.stringContaining('node_modules')]));
   });
 
   it('reports unresolved local imports', async () => {
@@ -82,7 +82,7 @@ describe('discoverModuleImports', () => {
 
       expect(result).toEqual({
         file: 'src/example.test.ts',
-        imports: [],
+        dependencies: [],
         unresolvedImports: ['./missing.js'],
       });
     } finally {
@@ -99,11 +99,11 @@ describe('discoverRepositoryModules', () => {
       expect.arrayContaining([
         {
           file: 'src/cli.test.ts',
-          imports: expect.arrayContaining(['src/cli.ts']),
+          dependencies: expect.arrayContaining(['src/cli.ts']),
         },
         {
           file: 'src/cli.ts',
-          imports: expect.arrayContaining(['src/config/cli-options.ts', 'src/changes/git-changes.ts']),
+          dependencies: expect.arrayContaining(['src/config/cli-options.ts', 'src/changes/git-changes.ts']),
         },
       ]),
     );

@@ -66,7 +66,7 @@ export async function discoverModuleImports(file: string, repoRoot: string): Pro
 
   return {
     file: relativeFilePath,
-    imports: relativeImportPaths,
+    dependencies: relativeImportPaths,
     ...(unresolvedImports.length > 0 ? { unresolvedImports } : {}),
   };
 }
@@ -86,7 +86,7 @@ export async function discoverRepositoryModules(testFiles: string[], repoRoot: s
 
     modules.push(moduleImports);
 
-    for (const dependency of moduleImports.imports) {
+    for (const dependency of moduleImports.dependencies) {
       await visit(dependency);
     }
   }

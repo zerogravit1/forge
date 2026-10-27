@@ -8,15 +8,15 @@ const testFiles = ['src/orders/order-service.test.ts'];
 const modules: ModuleDependency[] = [
   {
     file: 'src/orders/order-service.test.ts',
-    imports: ['src/orders/order-service.ts'],
+    dependencies: ['src/orders/order-service.ts'],
   },
   {
     file: 'src/orders/order-service.ts',
-    imports: ['src/orders/order-validator.ts'],
+    dependencies: ['src/orders/order-validator.ts'],
   },
   {
     file: 'src/orders/order-validator.ts',
-    imports: [],
+    dependencies: [],
   },
 ];
 
@@ -34,15 +34,15 @@ describe('resolveTestDependencies', () => {
     const modules: ModuleDependency[] = [
       {
         file: 'src/orders/order-service.test.ts',
-        imports: ['src/orders/order-service.ts'],
+        dependencies: ['src/orders/order-service.ts'],
       },
       {
         file: 'src/orders/order-service.ts',
-        imports: ['src/orders/order-validator.ts'],
+        dependencies: ['src/orders/order-validator.ts'],
       },
       {
         file: 'src/orders/order-validator.ts',
-        imports: ['src/orders/order-service.ts'],
+        dependencies: ['src/orders/order-service.ts'],
       },
     ];
 
@@ -60,15 +60,15 @@ describe('resolveTestDependencies', () => {
     const modules: ModuleDependency[] = [
       {
         file: 'src/orders/order-service.test.ts',
-        imports: ['src/orders/order-service.ts'],
+        dependencies: ['src/orders/order-service.ts'],
       },
       {
         file: 'src/orders/order-controller.test.ts',
-        imports: ['src/orders/order-service.ts'],
+        dependencies: ['src/orders/order-service.ts'],
       },
       {
         file: 'src/orders/order-service.ts',
-        imports: [],
+        dependencies: [],
       },
     ];
 
@@ -88,12 +88,12 @@ describe('resolveTestDependencies', () => {
     const modules = [
       {
         file: 'src/example.test.ts',
-        imports: ['src/service.ts'],
+        dependencies: ['src/service.ts'],
       },
       {
         file: 'src/service.ts',
-        imports: [],
-        unresolvedImports: ['./missing.js'],
+        dependencies: [],
+        unresolvedDependencies: ['./missing.js'],
       },
     ];
 
