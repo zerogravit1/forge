@@ -83,7 +83,7 @@ describe('discoverModuleImports', () => {
       expect(result).toEqual({
         file: 'src/example.test.ts',
         dependencies: [],
-        unresolvedImports: ['./missing.js'],
+        unresolvedDependencies: ['./missing.js'],
       });
     } finally {
       await rm(repoRoot, { recursive: true, force: true });

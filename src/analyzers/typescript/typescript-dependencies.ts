@@ -34,14 +34,14 @@ export async function discoverModuleImports(file: string, repoRoot: string): Pro
 
   const resolvedImportPaths: string[] = [];
 
-  const unresolvedImports: string[] = [];
+  const unresolvedDependencies: string[] = [];
 
   for (const statement of importStatements) {
     const resolvedPath = resolveImportPath(absolutePath, statement);
 
     if (!resolvedPath) {
       if (statement.startsWith('./') || statement.startsWith('../')) {
-        unresolvedImports.push(statement);
+        unresolvedDependencies.push(statement);
       }
 
       continue;
@@ -67,7 +67,7 @@ export async function discoverModuleImports(file: string, repoRoot: string): Pro
   return {
     file: relativeFilePath,
     dependencies: relativeImportPaths,
-    ...(unresolvedImports.length > 0 ? { unresolvedImports } : {}),
+    ...(unresolvedDependencies.length > 0 ? { unresolvedDependencies } : {}),
   };
 }
 
