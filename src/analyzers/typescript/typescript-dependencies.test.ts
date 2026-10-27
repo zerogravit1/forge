@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { discoverImports, resolveImportPath, discoverModuleImports, discoverRepositoryModules } from './typescript-dependencies.js';
+import {
+  discoverImports,
+  resolveImportPath,
+  discoverModuleImports,
+  discoverRepositoryModules,
+} from './typescript-dependencies.js';
 
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';

@@ -1,5 +1,6 @@
 import type { GitChange } from '../changes/git-changes.js';
-import { discoverRepositoryModules, resolveTestDependencies } from '../discovery/vitest-dependencies.js';
+import { discoverRepositoryModules } from '../analyzers/typescript/typescript-dependencies.js';
+import { resolveTestDependencies } from '../graph/resolve-test-dependencies.js';
 import { selectTests, type SelectionResult } from './select-tests.js';
 
 export async function planTestSelection(

@@ -27,7 +27,7 @@ export function discoverImports(source: string): string[] {
     .filter(ts.isStringLiteral)
     .map((specifier) => specifier.text);
 
-  return [...dependencies, ...exportDependencies]
+  return [...dependencies, ...exportDependencies];
 }
 
 export async function discoverModuleImports(file: string, repoRoot: string): Promise<ModuleImports> {
