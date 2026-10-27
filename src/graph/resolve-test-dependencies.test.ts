@@ -101,7 +101,7 @@ describe('resolveTestDependencies', () => {
 
     expect(result[0]).toMatchObject({
       testFile: 'src/example.test.ts',
-      unresolvedImports: [
+      unresolvedDependencies: [
         {
           file: 'src/service.ts',
           specifier: './missing.js',

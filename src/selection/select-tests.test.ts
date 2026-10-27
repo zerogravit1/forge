@@ -88,7 +88,7 @@ describe('selectTests', () => {
       {
         testFile: 'src/orders/order-service.test.ts',
         dependencies: ['src/orders/order-service.ts'],
-        unresolvedImports: [
+        unresolvedDependencies: [
           {
             file: 'src/orders/order-service.ts',
             specifier: './missing.js',

@@ -6,7 +6,7 @@ export function resolveTestDependencies(testFiles: string[], modules: ModuleDepe
 
   return testFiles.map((testFile) => {
     const visited = new Set<string>();
-    const unresolvedImports: { file: string; specifier: string }[] = [];
+    const unresolvedDependencies: { file: string; specifier: string }[] = [];
 
     function visit(file: string): void {
       const module = modulesByFile.get(file);
@@ -22,7 +22,7 @@ export function resolveTestDependencies(testFiles: string[], modules: ModuleDepe
       }
 
       for (const specifier of module?.unresolvedDependencies ?? []) {
-        unresolvedImports.push({
+        unresolvedDependencies.push({
           file,
           specifier,
         });
@@ -34,7 +34,7 @@ export function resolveTestDependencies(testFiles: string[], modules: ModuleDepe
     return {
       testFile,
       dependencies: [...visited],
-      ...(unresolvedImports.length > 0 ? { unresolvedImports } : {}),
+      ...(unresolvedDependencies.length > 0 ? { unresolvedDependencies } : {}),
     };
   });
 }
