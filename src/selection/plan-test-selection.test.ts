@@ -26,7 +26,7 @@ describe('planTestSelection', () => {
       [{ status: 'modified', path: 'src/OrderService.java' }],
       ['src/OrderServiceTest.java'],
       '/repo',
-      analyzer
+      analyzer,
     );
 
     expect(result).toEqual({
@@ -34,9 +34,6 @@ describe('planTestSelection', () => {
       unmappedChanges: [],
     });
 
-    expect(discoverDependencies).toHaveBeenCalledWith(
-      ['src/OrderServiceTest.java'],
-      '/repo'
-    )
+    expect(discoverDependencies).toHaveBeenCalledWith(['src/OrderServiceTest.java'], '/repo');
   });
 });
