@@ -1,7 +1,7 @@
 import type { TestDependency } from '../models/test-dependency.js';
-import type { ModuleImports } from '../analyzers/typescript/typescript-dependencies.js';
+import type { ModuleDependency } from '../models/module-dependency.js';
 
-export function resolveTestDependencies(testFiles: string[], modules: ModuleImports[]): TestDependency[] {
+export function resolveTestDependencies(testFiles: string[], modules: ModuleDependency[]): TestDependency[] {
   const modulesByFile = new Map(modules.map((module) => [module.file, module]));
 
   return testFiles.map((testFile) => {

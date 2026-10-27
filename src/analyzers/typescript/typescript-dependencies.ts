@@ -2,11 +2,7 @@ import ts from 'typescript';
 import { readFile } from 'fs/promises';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 
-export interface ModuleImports {
-  file: string;
-  imports: string[];
-  unresolvedImports?: string[];
-}
+import type { ModuleDependency } from '../../models/module-dependency.js';
 
 export function discoverImports(source: string): string[] {
   const parsed = ts.createSourceFile('example.ts', source, ts.ScriptTarget.Latest, true);
@@ -30,7 +26,7 @@ export function discoverImports(source: string): string[] {
   return [...dependencies, ...exportDependencies];
 }
 
-export async function discoverModuleImports(file: string, repoRoot: string): Promise<ModuleImports> {
+export async function discoverModuleImports(file: string, repoRoot: string): Promise<ModuleDependency> {
   const absolutePath = resolve(repoRoot, file);
   const source = await readFile(absolutePath, 'utf8');
 
@@ -75,9 +71,9 @@ export async function discoverModuleImports(file: string, repoRoot: string): Pro
   };
 }
 
-export async function discoverRepositoryModules(testFiles: string[], repoRoot: string): Promise<ModuleImports[]> {
+export async function discoverRepositoryModules(testFiles: string[], repoRoot: string): Promise<ModuleDependency[]> {
   const visited = new Set<string>();
-  const modules: ModuleImports[] = [];
+  const modules: ModuleDependency[] = [];
 
   async function visit(file: string): Promise<void> {
     if (visited.has(file)) {
