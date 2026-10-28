@@ -85,3 +85,34 @@ export function discoverConstructedType(source: string): string[] {
     .map((match) => match[1])
     .filter((name): name is string => name !== undefined);
 }
+
+export async function discoverJavaRepositoryModules(
+  testFiles: string[],
+  repoRoot: string,
+  sourceRoots: readonly string[],
+): Promise<ModuleDependency[]> {
+  const visited = new Set<string>();
+  const modules: ModuleDependency[] = [];
+
+  async function visit(file: string): Promise<void> {
+    if (visited.has(file)) {
+      return;
+    }
+
+    visited.add(file);
+
+    const moduleDependencies = await discoverJavaModuleDependencies(file, repoRoot, sourceRoots);
+
+    modules.push(moduleDependencies);
+
+    for (const dependency of moduleDependencies.dependencies) {
+      await visit(dependency);
+    }
+  }
+
+  for (const testFile of testFiles) {
+    await visit(testFile);
+  }
+
+  return modules;
+}

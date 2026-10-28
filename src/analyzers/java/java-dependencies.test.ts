@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { discoverJavaModuleDependencies, discoverJavaPackage } from './java-dependencies.js';
+import {
+  discoverJavaModuleDependencies,
+  discoverJavaPackage,
+  discoverJavaRepositoryModules,
+} from './java-dependencies.js';
+import { resolveTestDependencies } from '../../graph/resolve-test-dependencies.js';
 
 const sourceRoots = ['examples/java-orders/src/main/java', 'examples/java-orders/src/test/java'];
 
@@ -41,5 +46,22 @@ describe('discoverJavaPackage', () => {
     const source = 'public class Example {}';
 
     expect(discoverJavaPackage(source)).toBeUndefined();
+  });
+});
+
+describe('discoverJavaRepositoryModules', () => {
+  it('discovers transitive Java dependencies', async () => {
+    const testFile = 'examples/java-orders/src/test/java/com/forge/OrderServiceTest.java';
+
+    const modules = await discoverJavaRepositoryModules([testFile], process.cwd(), sourceRoots);
+
+    const dependencies = resolveTestDependencies([testFile], modules);
+
+    expect(dependencies[0]?.dependencies).toEqual(
+      expect.arrayContaining([
+        'examples/java-orders/src/main/java/com/forge/orders/OrderService.java',
+        'examples/java-orders/src/main/java/com/forge/rules/OrderRules.java',
+      ]),
+    );
   });
 });
