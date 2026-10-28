@@ -38,7 +38,7 @@ describe('discoverJavaPackage', () => {
   });
 
   it('returns undefined when no package is declared', () => {
-    const source = 'public class Example {}'
+    const source = 'public class Example {}';
 
     expect(discoverJavaPackage(source)).toBeUndefined();
   });

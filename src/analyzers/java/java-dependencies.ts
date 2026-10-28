@@ -33,11 +33,7 @@ export async function discoverJavaModuleDependencies(
     for (const typeName of constructedTypes) {
       const qualifiedName = `${packageName}.${typeName}`;
 
-      const resolvedPath = await resolvePackagePath(
-        repoRoot,
-        sourceRoots,
-        qualifiedName,
-      );
+      const resolvedPath = await resolvePackagePath(repoRoot, sourceRoots, qualifiedName);
 
       if (resolvedPath && resolvedPath !== file && !dependencies.includes(resolvedPath)) {
         dependencies.push(resolvedPath);
