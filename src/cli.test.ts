@@ -202,9 +202,9 @@ describe('main', () => {
           path: 'src/unknown-service.ts',
         },
         {
-        status: 'modified' as const,
-        path: 'src/unknown-collection.ts',
-      },
+          status: 'modified' as const,
+          path: 'src/unknown-collection.ts',
+        },
       ],
     }));
 
