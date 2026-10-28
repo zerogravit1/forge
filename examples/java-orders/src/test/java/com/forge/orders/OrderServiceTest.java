@@ -18,6 +18,6 @@ class OrderServiceTest {
 
   @Test
   void rejectsNegativeQuantity() {
-    assertFalse(service.createOrder(0));
+    assertFalse(service.createOrder(-1));
   }
 }
