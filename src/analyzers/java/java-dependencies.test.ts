@@ -51,7 +51,7 @@ describe('discoverJavaPackage', () => {
 
 describe('discoverJavaRepositoryModules', () => {
   it('discovers transitive Java dependencies', async () => {
-    const testFile = 'examples/java-orders/src/test/java/com/forge/OrderServiceTest.java';
+    const testFile = 'examples/java-orders/src/test/java/com/forge/orders/OrderServiceTest.java';
 
     const modules = await discoverJavaRepositoryModules([testFile], process.cwd(), sourceRoots);
 
