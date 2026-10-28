@@ -66,6 +66,16 @@ export async function main(
           }
         }
 
+        const unmappedCount = selection.unmappedChanges.length;
+
+        if (unmappedCount > 0) {
+          const changeLabel = unmappedCount === 1 ? 'change has' : 'changes have';
+
+          process.stdout.write(
+            `\nSelection incomplete: ${unmappedCount} ${changeLabel} no known test mapping.\n`
+          )
+        }
+
         return 0;
       }
 

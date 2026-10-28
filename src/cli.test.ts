@@ -101,6 +101,132 @@ describe('main', () => {
     expect(stdout).toHaveBeenCalledWith('renamed\tsrc/old-file.ts -> src/new-file.ts\n');
   });
 
+  it('reports an incomplete selection when a changed file has no mapping', async () => {
+    const getChanges = vi.fn(async () => [
+      {
+        status: 'modified' as const,
+        path: 'src/unknown-service.ts',
+      },
+    ]);
+
+    const planSelection = vi.fn(async () => ({
+      selectedTests: [],
+      unmappedChanges: [
+        {
+          status: 'modified' as const,
+          path: 'src/unknown-service.ts',
+        },
+      ],
+    }));
+
+    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    const exitCode = await main(['plan'], getChanges, {
+      discoverTestFiles,
+      planSelection,
+    });
+
+    expect(exitCode).toBe(0);
+
+    expect(stdout).toHaveBeenCalledWith('\nSelected tests:\n');
+    expect(stdout).toHaveBeenCalledWith('  None\n');
+
+    expect(stdout).toHaveBeenCalledWith('\nUnmapped changes:\n');
+    expect(stdout).toHaveBeenCalledWith('  modified\tsrc/unknown-service.ts\n');
+
+    expect(stdout).toHaveBeenCalledWith('\nSelection incomplete: 1 change has no known test mapping.\n');
+  });
+
+  it('reports an incomplete selection when some tests are selected but other changes are unmapped', async () => {
+    const orderTest = 'src/orders/order-service.test.ts';
+    const inventoryFile = 'src/inventory/inventory-service.ts';
+
+    const getChanges = vi.fn(async () => [
+      {
+        status: 'modified' as const,
+        path: orderTest,
+      },
+      {
+        status: 'modified' as const,
+        path: inventoryFile,
+      },
+    ]);
+
+    const discoverTestFiles = vi.fn(async () => [orderTest]);
+
+    const planSelection = vi.fn(async () => ({
+      selectedTests: [orderTest],
+      unmappedChanges: [
+        {
+          status: 'modified' as const,
+          path: inventoryFile,
+        },
+      ],
+    }));
+
+    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    const exitCode = await main(['plan'], getChanges, {
+      discoverTestFiles,
+      planSelection,
+    });
+
+    expect(exitCode).toBe(0);
+
+    expect(stdout).toHaveBeenCalledWith('\nSelected tests:\n');
+    expect(stdout).toHaveBeenCalledWith(`  ${orderTest}\n`);
+
+    expect(stdout).toHaveBeenCalledWith('\nUnmapped changes:\n');
+    expect(stdout).toHaveBeenCalledWith(`  modified\t${inventoryFile}\n`);
+
+    expect(stdout).toHaveBeenCalledWith('\nSelection incomplete: 1 change has no known test mapping.\n');
+  });
+
+  it('reports an incomplete selection when 2 changed files have no mapping', async () => {
+    const getChanges = vi.fn(async () => [
+      {
+        status: 'modified' as const,
+        path: 'src/unknown-service.ts',
+      },
+      {
+        status: 'modified' as const,
+        path: 'src/unknown-collection.ts',
+      },
+    ]);
+
+    const planSelection = vi.fn(async () => ({
+      selectedTests: [],
+      unmappedChanges: [
+        {
+          status: 'modified' as const,
+          path: 'src/unknown-service.ts',
+        },
+        {
+        status: 'modified' as const,
+        path: 'src/unknown-collection.ts',
+      },
+      ],
+    }));
+
+    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    const exitCode = await main(['plan'], getChanges, {
+      discoverTestFiles,
+      planSelection,
+    });
+
+    expect(exitCode).toBe(0);
+
+    expect(stdout).toHaveBeenCalledWith('\nSelected tests:\n');
+    expect(stdout).toHaveBeenCalledWith('  None\n');
+
+    expect(stdout).toHaveBeenCalledWith('\nUnmapped changes:\n');
+    expect(stdout).toHaveBeenCalledWith('  modified\tsrc/unknown-service.ts\n');
+    expect(stdout).toHaveBeenCalledWith('  modified\tsrc/unknown-collection.ts\n');
+
+    expect(stdout).toHaveBeenCalledWith('\nSelection incomplete: 2 changes have no known test mapping.\n');
+  });
+
   it('returns an error when no command is provided', async () => {
     const getChanges = vi.fn(async () => []);
 
