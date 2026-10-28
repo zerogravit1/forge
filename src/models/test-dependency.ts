@@ -1,7 +1,7 @@
 export interface TestDependency {
   testFile: string;
   dependencies: string[];
-  unresolvedImports?: {
+  unresolvedDependencies?: {
     file: string;
     specifier: string;
   }[];

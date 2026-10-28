@@ -1,13 +1,8 @@
 import ts from 'typescript';
 import { readFile } from 'fs/promises';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
-import type { TestDependency } from '../models/test-dependency.js';
 
-export interface ModuleImports {
-  file: string;
-  imports: string[];
-  unresolvedImports?: string[];
-}
+import type { ModuleDependency } from '../../models/module-dependency.js';
 
 export function discoverImports(source: string): string[] {
   const parsed = ts.createSourceFile('example.ts', source, ts.ScriptTarget.Latest, true);
@@ -31,7 +26,7 @@ export function discoverImports(source: string): string[] {
   return [...dependencies, ...exportDependencies];
 }
 
-export async function discoverModuleImports(file: string, repoRoot: string): Promise<ModuleImports> {
+export async function discoverModuleImports(file: string, repoRoot: string): Promise<ModuleDependency> {
   const absolutePath = resolve(repoRoot, file);
   const source = await readFile(absolutePath, 'utf8');
 
@@ -39,14 +34,14 @@ export async function discoverModuleImports(file: string, repoRoot: string): Pro
 
   const resolvedImportPaths: string[] = [];
 
-  const unresolvedImports: string[] = [];
+  const unresolvedDependencies: string[] = [];
 
   for (const statement of importStatements) {
     const resolvedPath = resolveImportPath(absolutePath, statement);
 
     if (!resolvedPath) {
       if (statement.startsWith('./') || statement.startsWith('../')) {
-        unresolvedImports.push(statement);
+        unresolvedDependencies.push(statement);
       }
 
       continue;
@@ -71,14 +66,14 @@ export async function discoverModuleImports(file: string, repoRoot: string): Pro
 
   return {
     file: relativeFilePath,
-    imports: relativeImportPaths,
-    ...(unresolvedImports.length > 0 ? { unresolvedImports } : {}),
+    dependencies: relativeImportPaths,
+    ...(unresolvedDependencies.length > 0 ? { unresolvedDependencies } : {}),
   };
 }
 
-export async function discoverRepositoryModules(testFiles: string[], repoRoot: string): Promise<ModuleImports[]> {
+export async function discoverRepositoryModules(testFiles: string[], repoRoot: string): Promise<ModuleDependency[]> {
   const visited = new Set<string>();
-  const modules: ModuleImports[] = [];
+  const modules: ModuleDependency[] = [];
 
   async function visit(file: string): Promise<void> {
     if (visited.has(file)) {
@@ -91,7 +86,7 @@ export async function discoverRepositoryModules(testFiles: string[], repoRoot: s
 
     modules.push(moduleImports);
 
-    for (const dependency of moduleImports.imports) {
+    for (const dependency of moduleImports.dependencies) {
       await visit(dependency);
     }
   }
@@ -113,42 +108,4 @@ export function resolveImportPath(importingFile: string, importSpecifier: string
   const result = ts.resolveModuleName(importSpecifier, importingFile, compilerOptions, ts.sys);
 
   return result.resolvedModule?.resolvedFileName;
-}
-
-export function resolveTestDependencies(testFiles: string[], modules: ModuleImports[]): TestDependency[] {
-  const modulesByFile = new Map(modules.map((module) => [module.file, module]));
-
-  return testFiles.map((testFile) => {
-    const visited = new Set<string>();
-    const unresolvedImports: { file: string; specifier: string }[] = [];
-
-    function visit(file: string): void {
-      const module = modulesByFile.get(file);
-      const imports = module?.imports ?? [];
-
-      for (const dependency of imports) {
-        if (dependency === testFile || visited.has(dependency)) {
-          continue;
-        }
-
-        visited.add(dependency);
-        visit(dependency);
-      }
-
-      for (const specifier of module?.unresolvedImports ?? []) {
-        unresolvedImports.push({
-          file,
-          specifier,
-        });
-      }
-    }
-
-    visit(testFile);
-
-    return {
-      testFile,
-      dependencies: [...visited],
-      ...(unresolvedImports.length > 0 ? { unresolvedImports } : {}),
-    };
-  });
 }

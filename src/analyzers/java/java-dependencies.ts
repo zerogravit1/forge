@@ -1,0 +1,118 @@
+import { relative, resolve, sep } from 'node:path';
+import { readFile, stat } from 'node:fs/promises';
+
+import type { ModuleDependency } from '../../models/module-dependency.js';
+
+export async function discoverJavaModuleDependencies(
+  file: string,
+  repoRoot: string,
+  sourceRoots: readonly string[],
+): Promise<ModuleDependency> {
+  const absolutePath = resolve(repoRoot, file);
+  const source = await readFile(absolutePath, 'utf8');
+
+  const packageName = discoverJavaPackage(source);
+  const imports = [...source.matchAll(/^\s*import\s+([\w.]+)\s*;/gm)].map((match) => match[1]);
+
+  const dependencies: string[] = [];
+  const unresolvedDependencies: string[] = [];
+
+  for (const importName of imports) {
+    if (!importName) continue;
+
+    const resolvedPath = await resolvePackagePath(repoRoot, sourceRoots, importName);
+
+    if (resolvedPath) {
+      dependencies.push(resolvedPath);
+    }
+  }
+
+  if (packageName) {
+    const constructedTypes = discoverConstructedType(source);
+
+    for (const typeName of constructedTypes) {
+      const qualifiedName = `${packageName}.${typeName}`;
+
+      const resolvedPath = await resolvePackagePath(repoRoot, sourceRoots, qualifiedName);
+
+      if (resolvedPath && resolvedPath !== file && !dependencies.includes(resolvedPath)) {
+        dependencies.push(resolvedPath);
+      }
+    }
+  }
+
+  return {
+    file,
+    dependencies,
+    ...(unresolvedDependencies.length > 0 && { unresolvedDependencies }),
+  };
+}
+
+export async function resolvePackagePath(
+  repoRoot: string,
+  sourceRoots: readonly string[],
+  importName: string,
+): Promise<string | undefined> {
+  const classPath = `${importName.replaceAll('.', '/')}.java`;
+
+  for (const sourceRoot of sourceRoots) {
+    const candidate = resolve(repoRoot, sourceRoot, classPath);
+
+    try {
+      const fileStat = await stat(candidate);
+
+      if (fileStat.isFile()) {
+        return relative(repoRoot, candidate).split(sep).join('/');
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+export function discoverJavaPackage(source: string): string | undefined {
+  const match = source.match(/^\s*package\s+([\w.]+)\s*;/m);
+
+  return match?.[1];
+}
+
+export function discoverConstructedType(source: string): string[] {
+  return [...source.matchAll(/\bnew\s+([A-Za-z_$][\w$]*)\s*\(/g)]
+    .map((match) => match[1])
+    .filter((name): name is string => name !== undefined);
+}
+
+export async function discoverJavaRepositoryModules(
+  testFiles: string[],
+  repoRoot: string,
+  sourceRoots: readonly string[],
+): Promise<ModuleDependency[]> {
+  const visited = new Set<string>();
+  const modules: ModuleDependency[] = [];
+
+  async function visit(file: string): Promise<void> {
+    if (visited.has(file)) {
+      return;
+    }
+
+    visited.add(file);
+
+    const moduleDependencies = await discoverJavaModuleDependencies(file, repoRoot, sourceRoots);
+
+    modules.push(moduleDependencies);
+
+    for (const dependency of moduleDependencies.dependencies) {
+      await visit(dependency);
+    }
+  }
+
+  for (const testFile of testFiles) {
+    await visit(testFile);
+  }
+
+  return modules;
+}

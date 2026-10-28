@@ -13,7 +13,7 @@ export function selectTests(changedFiles: GitChange[], testDependencies: TestDep
         (change) => testDependency.testFile === change.path || testDependency.dependencies.includes(change.path),
       );
 
-      const uncertainImpact = changedFiles.length > 0 && (testDependency.unresolvedImports?.length ?? 0) > 0;
+      const uncertainImpact = changedFiles.length > 0 && (testDependency.unresolvedDependencies?.length ?? 0) > 0;
 
       return knownImpact || uncertainImpact;
     })
