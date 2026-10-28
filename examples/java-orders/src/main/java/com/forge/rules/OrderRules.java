@@ -1,4 +1,4 @@
-package com.forge.rules
+package com.forge.rules;
 
 public class OrderRules {
   public boolean isValidQuantity(int quantity) {

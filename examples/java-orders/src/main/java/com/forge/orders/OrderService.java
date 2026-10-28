@@ -1,4 +1,4 @@
-package com.forge.orders
+package com.forge.orders;
 
 import com.forge.rules.OrderRules;
 
