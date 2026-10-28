@@ -64,3 +64,9 @@ export function discoverJavaPackage(source: string): string | undefined {
 
   return match?.[1];
 }
+
+export function discoverConstructedType(source: string): string[] {
+  return [...source.matchAll(/\bnew\s+([A-Za-z_$][\w$]*)\s*\(/g)]
+    .map((match) => match[1])
+    .filter((name): name is string => name !== undefined);
+}
