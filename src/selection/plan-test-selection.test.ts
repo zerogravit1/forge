@@ -39,7 +39,7 @@ describe('planTestSelection', () => {
   });
 
   it('selects only impacted Java tests', async () => {
-    const sourceRoots = ['examples/java-orders/src/main/java', 'exmaples/java-orders/src/test/java'];
+    const sourceRoots = ['examples/java-orders/src/main/java', 'examples/java-orders/src/test/java'];
 
     const orderTest = 'examples/java-orders/src/test/java/com/forge/orders/OrderServiceTest.java';
     const inventoryTest = 'examples/java-orders/src/test/java/com/forge/inventory/InventoryServiceTest.java';
