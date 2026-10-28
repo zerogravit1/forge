@@ -3,8 +3,7 @@ import { readFile, stat } from 'node:fs/promises';
 
 import type { ModuleDependency } from '../../models/module-dependency.js';
 
-
-export async function discoverJavaModuleDependencies (
+export async function discoverJavaModuleDependencies(
   file: string,
   repoRoot: string,
   sourceRoots: readonly string[],
@@ -12,9 +11,7 @@ export async function discoverJavaModuleDependencies (
   const absolutePath = resolve(repoRoot, file);
   const source = await readFile(absolutePath, 'utf8');
 
-  const imports = [...source.matchAll(/^\s*import\s+([\w.]+)\s*;/gm)].map(
-    (match) => match[1],
-  );
+  const imports = [...source.matchAll(/^\s*import\s+([\w.]+)\s*;/gm)].map((match) => match[1]);
 
   const dependencies: string[] = [];
   const unresolvedDependencies: string[] = [];
@@ -22,11 +19,10 @@ export async function discoverJavaModuleDependencies (
   for (const importName of imports) {
     if (!importName) continue;
 
-    const resolvedPath = resolvePackagePath(repoRoot, sourceRoots, importName);
+    const resolvedPath = await resolvePackagePath(repoRoot, sourceRoots, importName);
 
     if (resolvedPath) {
       dependencies.push(resolvedPath);
-    } else {
     }
   }
 
@@ -34,7 +30,7 @@ export async function discoverJavaModuleDependencies (
     file,
     dependencies,
     ...(unresolvedDependencies.length > 0 && { unresolvedDependencies }),
-  }
+  };
 }
 
 export async function resolvePackagePath(
