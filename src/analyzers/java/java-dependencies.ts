@@ -21,12 +21,11 @@ export async function discoverJavaModuleDependencies (
   for (const importName of imports) {
     if (!importName) continue;
 
-    const resolvedPath = resolvePackagePath(repoRoot, importName);
+    const resolvedPath = resolvePackagePath(repoRoot, sourceRoots, importName);
 
     if (resolvedPath) {
       dependencies.push(resolvedPath);
     } else {
-      console.log(`external dependencies: ${resolvedPath}`);
     }
   }
 
@@ -44,8 +43,13 @@ export async function resolvePackagePath(
 ): Promise<string | undefined> {
   const classPath = `${importName.replaceAll('.', '/')}.java`;
 
+  const sourceRoots = [
+    'examples/java-order/src/main/java',
+    'examples/java-order/src/test/java'
+  ]
+
   for (const sourceRoot of sourceRoots) {
-    const candidate = resolve(repoRoot, sourceRoot, classPath);
+    const candidate = resolve(repoRoot, sourceRoots, classPath);
 
     try {
       const fileStat = await stat(candidate);
