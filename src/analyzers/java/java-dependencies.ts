@@ -6,7 +6,8 @@ import type { ModuleDependency } from '../../models/module-dependency.js';
 
 export async function discoverJavaModuleDependencies (
   file: string,
-  repoRoot: string
+  repoRoot: string,
+  sourceRoots: readonly string[],
 ): Promise<ModuleDependency> {
   const absolutePath = resolve(repoRoot, file);
   const source = await readFile(absolutePath, 'utf8');
@@ -43,13 +44,8 @@ export async function resolvePackagePath(
 ): Promise<string | undefined> {
   const classPath = `${importName.replaceAll('.', '/')}.java`;
 
-  const sourceRoots = [
-    'examples/java-order/src/main/java',
-    'examples/java-order/src/test/java'
-  ]
-
   for (const sourceRoot of sourceRoots) {
-    const candidate = resolve(repoRoot, sourceRoots, classPath);
+    const candidate = resolve(repoRoot, sourceRoot, classPath);
 
     try {
       const fileStat = await stat(candidate);
