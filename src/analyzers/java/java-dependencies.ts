@@ -11,6 +11,7 @@ export async function discoverJavaModuleDependencies(
   const absolutePath = resolve(repoRoot, file);
   const source = await readFile(absolutePath, 'utf8');
 
+  const packageName = discoverJavaPackage(source);
   const imports = [...source.matchAll(/^\s*import\s+([\w.]+)\s*;/gm)].map((match) => match[1]);
 
   const dependencies: string[] = [];
@@ -23,6 +24,24 @@ export async function discoverJavaModuleDependencies(
 
     if (resolvedPath) {
       dependencies.push(resolvedPath);
+    }
+  }
+
+  if (packageName) {
+    const constructedTypes = discoverConstructedType(source);
+
+    for (const typeName of constructedTypes) {
+      const qualifiedName = `${packageName}.${typeName}`;
+
+      const resolvedPath = await resolvePackagePath(
+        repoRoot,
+        sourceRoots,
+        qualifiedName,
+      );
+
+      if (resolvedPath && resolvedPath !== file && !dependencies.includes(resolvedPath)) {
+        dependencies.push(resolvedPath);
+      }
     }
   }
 
