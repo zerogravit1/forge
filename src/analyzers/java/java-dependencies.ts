@@ -58,3 +58,9 @@ export async function resolvePackagePath(
 
   return undefined;
 }
+
+export function discoverJavaPackage(source: string): string | undefined {
+  const match = source.match(/^\s*package\s+([\w.]+)\s*;/m);
+
+  return match?.[1];
+}
