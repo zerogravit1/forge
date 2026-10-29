@@ -1,5 +1,5 @@
 import type { TestRunner } from './test-runner.js';
-import type { runCommand, } from './command-runner.js';
+import { runCommand, } from './command-runner.js';
 
 export function createVitestRunner(
   execute: typeof runCommand = runCommand,

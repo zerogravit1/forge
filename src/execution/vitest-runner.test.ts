@@ -15,7 +15,9 @@ describe('createVitestRunner', () => {
       process.cwd(),
     );
 
-    expect(execute).toHaveBeenNthCalledWith(
+    expect(execute).toHaveBeenCalledOnce();
+
+    expect(execute).toHaveBeenCalledWith(
       'npx',
       [
         '--no-install',
@@ -27,6 +29,6 @@ describe('createVitestRunner', () => {
       process.cwd()
     );
 
-    expect(result).toEqual({ exiteCode: 0 });
+    expect(result).toEqual({ exitCode: 0 });
   });
 });
