@@ -28,4 +28,14 @@ describe('createVitestRunner', () => {
 
     expect(execute).not.toHaveBeenCalled();
   });
+
+  it('returns a nonzero exit code when tests fail', async () => {
+    const execute = vi.fn(async () => 1);
+    const runner = createVitestRunner(execute);
+
+    const result = await runner.run(['src/cli.test.ts'], process.cwd());
+
+    expect(execute).toHaveBeenCalledOnce();
+    expect(result).toEqual({ exitCode: 1 });
+  });
 });
