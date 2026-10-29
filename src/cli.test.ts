@@ -309,4 +309,48 @@ describe('main', () => {
 
     expect(planSelection).not.toHaveBeenCalled();
   });
+
+  it('executes selected tests when the selection is complete', async () => {
+    const testFile = 'src/cli.test.ts';
+
+    const getChanges = vi.fn(async () => [
+      {
+        status: 'modified' as const,
+        path: 'src/cli.ts',
+      },
+    ]);
+
+    const discoverTestFiles = vi.fn(async () => [testFile]);
+
+    const planSelection = vi.fn(async () => ({
+      selectedTests: [testFile],
+      unmappedChanges: [],
+    }));
+
+    const runner = {
+      id: 'vitest',
+      run: vi.fn(async () => ({ exitCode: 0 })),
+    };
+
+    const exitCode = await main(['run'], getChanges, {
+      discoverTestFiles,
+      planSelection,
+      runner,
+    });
+
+    expect(discoverTestFiles).toHaveBeenCalledWith(process.cwd());
+
+    expect(planSelection).toHaveBeenCalledWith(
+      [{ status: 'modified', path: 'src/cli.ts' }],
+      [testFile],
+      process.cwd(),
+    );
+
+    expect(runner.run).toHaveBeenCalledExactlyOnceWith(
+      [testFile],
+      process.cwd(),
+    );
+
+    expect(exitCode).toBe(0);
+  });
 });
