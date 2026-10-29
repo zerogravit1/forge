@@ -5,8 +5,5 @@ export interface ExecutionResults {
 export interface TestRunner {
   readonly id: string;
 
-  run(
-    testFiles: string[],
-    repoRoot: string,
-  ): Promise<ExecutionResults>;
+  run(testFiles: string[], repoRoot: string): Promise<ExecutionResults>;
 }
