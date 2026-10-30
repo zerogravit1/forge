@@ -354,7 +354,7 @@ describe('main', () => {
     expect(exitCode).toBe(0);
   });
 
-  it('propragates the test runner exit code', async () => {
+  it('propagates the test runner exit code', async () => {
     const getChanges = vi.fn(async () => [
       {
         status: 'modified' as const,
@@ -382,5 +382,44 @@ describe('main', () => {
 
     expect(runner.run).toHaveBeenCalledOnce();
     expect(exitCode).toBe(1);
+  });
+
+  it('runs all discovered tests when selection is incomplete', async () => {
+    const getChanges = vi.fn(async () => [
+      { status: 'modified' as const, path: 'src/cli.ts' },
+      { status: 'modified' as const, path: 'src/unknown.ts' },
+    ]);
+
+    const testFiles = [
+      'src/cli.test.ts',
+      'src/selection/select-tests.test.ts'
+    ];
+
+    const discoverTestFiles = vi.fn(async () => testFiles);
+
+    const planSelection = vi.fn(async () => ({
+      selectedTests: ['src/cli.test.ts'],
+      unmappedChanges: [
+        { status: 'modified' as const, path: 'src/unknown.ts' }
+      ],
+    }));
+
+    const runner = {
+      id: 'vitest',
+      run: vi.fn(async () => ({ exitCode: 0 })),
+    };
+
+    const exitCode = await main(['run'], getChanges, {
+      discoverTestFiles,
+      planSelection,
+      runner,
+    });
+
+    expect(runner.run).toHaveBeenCalledExactlyOnceWith(
+      testFiles,
+      process.cwd(),
+    );
+
+    expect(exitCode).toBe(0);
   });
 });
