@@ -390,18 +390,13 @@ describe('main', () => {
       { status: 'modified' as const, path: 'src/unknown.ts' },
     ]);
 
-    const testFiles = [
-      'src/cli.test.ts',
-      'src/selection/select-tests.test.ts'
-    ];
+    const testFiles = ['src/cli.test.ts', 'src/selection/select-tests.test.ts'];
 
     const discoverTestFiles = vi.fn(async () => testFiles);
 
     const planSelection = vi.fn(async () => ({
       selectedTests: ['src/cli.test.ts'],
-      unmappedChanges: [
-        { status: 'modified' as const, path: 'src/unknown.ts' }
-      ],
+      unmappedChanges: [{ status: 'modified' as const, path: 'src/unknown.ts' }],
     }));
 
     const runner = {
@@ -420,8 +415,6 @@ describe('main', () => {
     expect(runner.run).not.toHaveBeenCalled();
     expect(exitCode).toBe(1);
 
-    expect(stderr).toHaveBeenCalledWith(
-      'Selection incomplete. Execution requires a fallback policy.'
-    )
+    expect(stderr).toHaveBeenCalledWith('Selection incomplete. Execution requires a fallback policy.');
   });
 });
