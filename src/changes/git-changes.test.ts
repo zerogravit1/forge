@@ -82,4 +82,33 @@ describe('getGitChanges', () => {
 
     expect(execute).toHaveBeenCalledWith(expect.arrayContaining(['develop...feature/forge_cli']), undefined);
   });
+
+  it('includes tracked and untracked files in a worktree comparison', async () => {
+    const execute = vi.fn(async (args: string[]) => {
+      if (args[0] === 'diff') {
+        return 'M\0src/exising.ts\0';
+      }
+
+      if (args[0] === 'ls-files') {
+        return 'src/new.ts\0';
+      }
+
+      throw new Error('Unexpected Git command');
+    });
+
+    const changes = await getGitChanges(
+      {
+        from: 'HEAD',
+        to: 'worktree',
+      },
+      execute,
+    );
+
+    expect(changes).toEqual([
+      { status: 'modified', path: 'src/existing.ts' },
+      { status: 'added', path: 'src/new.ts' },
+    ]);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
 });
