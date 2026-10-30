@@ -384,7 +384,7 @@ describe('main', () => {
     expect(exitCode).toBe(1);
   });
 
-  it('runs all discovered tests when selection is incomplete', async () => {
+  it('does not execute tests when selection is incomplete', async () => {
     const getChanges = vi.fn(async () => [
       { status: 'modified' as const, path: 'src/cli.ts' },
       { status: 'modified' as const, path: 'src/unknown.ts' },
@@ -409,17 +409,19 @@ describe('main', () => {
       run: vi.fn(async () => ({ exitCode: 0 })),
     };
 
+    const stderr = vi.spyOn(console, 'error').mockImplementation(() => {});
+
     const exitCode = await main(['run'], getChanges, {
       discoverTestFiles,
       planSelection,
       runner,
     });
 
-    expect(runner.run).toHaveBeenCalledExactlyOnceWith(
-      testFiles,
-      process.cwd(),
-    );
+    expect(runner.run).not.toHaveBeenCalled();
+    expect(exitCode).toBe(1);
 
-    expect(exitCode).toBe(0);
+    expect(stderr).toHaveBeenCalledWith(
+      'Selection incomplete. Execution requires a fallback policy.'
+    )
   });
 });
