@@ -268,18 +268,28 @@ describe('main', () => {
     expect(exitCode).toBe(1);
   });
 
-  it('returns an error when the run command is provided', async () => {
+  it('does not execute tests when no changes are detected', async () => {
     const getChanges = vi.fn(async () => []);
+    const runner = {
+      id: 'vitest',
+      run: vi.fn(async () => ({ exitCode: 0 })),
+    };
 
-    const stderr = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
-    const exitCode = await main(['run'], getChanges);
+    const exitCode = await main(['run'], getChanges, {
+      discoverTestFiles,
+      planSelection,
+      runner,
+    });
 
-    expect(exitCode).toBe(2);
+    expect(exitCode).toBe(0);
+    expect(getChanges).toHaveBeenCalledOnce();
+    expect(discoverTestFiles).not.toHaveBeenCalled();
+    expect(planSelection).not.toHaveBeenCalled();
+    expect(runner.run).not.toHaveBeenCalled();
 
-    expect(getChanges).not.toHaveBeenCalled();
-
-    expect(stderr).toHaveBeenCalledWith('Run is not implemented yet');
+    expect(stdout).toHaveBeenCalledWith('No changes detected.\n');
   });
 
   it('returns an error when discoverTestFiles fail', async () => {
@@ -339,18 +349,38 @@ describe('main', () => {
     });
 
     expect(discoverTestFiles).toHaveBeenCalledWith(process.cwd());
-
-    expect(planSelection).toHaveBeenCalledWith(
-      [{ status: 'modified', path: 'src/cli.ts' }],
-      [testFile],
-      process.cwd(),
-    );
-
-    expect(runner.run).toHaveBeenCalledExactlyOnceWith(
-      [testFile],
-      process.cwd(),
-    );
-
+    expect(planSelection).toHaveBeenCalledWith([{ status: 'modified', path: 'src/cli.ts' }], [testFile], process.cwd());
+    expect(runner.run).toHaveBeenCalledExactlyOnceWith([testFile], process.cwd());
     expect(exitCode).toBe(0);
+  });
+
+  it('propragates the test runner exit code', async () => {
+    const getChanges = vi.fn(async () => [
+      {
+        status: 'modified' as const,
+        path: 'src/cli.ts',
+      },
+    ]);
+
+    const discoverTestFiles = vi.fn(async () => ['src/cli.test.ts']);
+
+    const planSelection = vi.fn(async () => ({
+      selectedTests: ['src/cli.test.ts'],
+      unmappedChanges: [],
+    }));
+
+    const runner = {
+      id: 'vitest',
+      run: vi.fn(async () => ({ exitCode: 1 })),
+    };
+
+    const exitCode = await main(['run'], getChanges, {
+      discoverTestFiles,
+      planSelection,
+      runner,
+    });
+
+    expect(runner.run).toHaveBeenCalledOnce();
+    expect(exitCode).toBe(1);
   });
 });
