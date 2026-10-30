@@ -2,15 +2,20 @@ import { readCliOptions } from './config/cli-options.js';
 import { getGitChanges } from './changes/git-changes.js';
 import { discoverVitestTestFiles } from './discovery/vitest-test-files.js';
 import { planTestSelection } from './selection/plan-test-selection.js';
+import { createVitestRunner } from './execution/vitest-runner.js';
+
+import type { TestRunner } from './execution/test-runner.js';
 
 interface CliServices {
   discoverTestFiles: typeof discoverVitestTestFiles;
   planSelection: typeof planTestSelection;
+  runner?: TestRunner;
 }
 
 const defaultServices: CliServices = {
   discoverTestFiles: discoverVitestTestFiles,
   planSelection: planTestSelection,
+  runner: createVitestRunner(),
 };
 
 export async function main(
@@ -77,9 +82,33 @@ export async function main(
         return 0;
       }
 
-      case 'run':
-        console.error('Run is not implemented yet');
-        return 2;
+      case 'run': {
+        const changes = await getChanges(options);
+
+        if (changes.length === 0) {
+          process.stdout.write('No changes detected.\n');
+          return 0;
+        }
+
+        const repoRoot = process.cwd();
+        const testFiles = await services.discoverTestFiles(repoRoot);
+        const selection = await services.planSelection(changes, testFiles, repoRoot);
+
+        if (selection.unmappedChanges.length > 0) {
+          console.error('Selection incomplete. Execution requires a fallback policy.');
+          return 1;
+        }
+
+        if (selection.selectedTests.length === 0) {
+          process.stdout.write('No tests selected.\n');
+          return 0;
+        }
+
+        const runner = services.runner ?? createVitestRunner();
+        const result = await runner.run(selection.selectedTests, repoRoot);
+
+        return result.exitCode;
+      }
     }
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
