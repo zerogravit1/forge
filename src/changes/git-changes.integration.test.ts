@@ -165,7 +165,7 @@ describe('getGitChanges integration', () => {
         cwd: repo,
       });
 
-      expect(changes).toEqual(expect.arrayContaining([{ status: 'deleted', path: 'deleted.ts' }]));
+      expect(changes).toEqual([{ status: 'deleted', path: 'deleted.ts' }]);
     } finally {
       await rm(repo, { recursive: true, force: true });
     }
