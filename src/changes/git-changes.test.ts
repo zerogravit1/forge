@@ -86,7 +86,7 @@ describe('getGitChanges', () => {
   it('includes tracked and untracked files in a worktree comparison', async () => {
     const execute = vi.fn(async (args: string[]) => {
       if (args[0] === 'diff') {
-        return 'M\0src/exising.ts\0';
+        return 'M\0src/existing.ts\0';
       }
 
       if (args[0] === 'ls-files') {

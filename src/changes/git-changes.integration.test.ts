@@ -74,4 +74,100 @@ describe('getGitChanges integration', () => {
       await rm(repo, { recursive: true, force: true });
     }
   });
+
+  it('detects staged, unstaged, and untracked working-tree changes', async () => {
+    const repo = await mkdtemp(join(tmpdir(), 'force-worktree-test-'));
+
+    const git = (args: string[]) =>
+      execFileSync('git', args, {
+        cwd: repo,
+        encoding: 'utf8',
+      }).trim();
+
+    try {
+      // Initialize a disposable Git repository
+      git(['init', '-q']);
+      git(['config', 'user.name', 'Forge Test']);
+      git(['config', 'user.email', 'forge@example.invalid']);
+      git(['config', 'commit.gpgsign', 'false']);
+
+      // Create the initial committed state.
+      await writeFile(join(repo, 'staged.ts'), 'version 1\n');
+      await writeFile(join(repo, 'unstaged.ts'), 'version 1\n');
+      await writeFile(join(repo, '.gitignore'), 'ignored.ts\n');
+
+      git(['add', '-A']);
+      git(['commit', '-qm', 'Initial commit']);
+
+      // Modify and stage one tracked file.
+      await writeFile(join(repo, 'staged.ts'), 'version 2\n');
+      git(['add', 'staged.ts']);
+
+      // Modify another tracked file without staging it.
+      await writeFile(join(repo, 'unstaged.ts'), 'version 2\n');
+
+      // Create an untracked file.
+      await writeFile(join(repo, 'untracked.ts'), 'new file\n');
+
+      // Create an ignored file.
+      await writeFile(join(repo, 'ignored.ts'), 'ignored file\n');
+
+      const changes = await getGitChanges({
+        from: 'HEAD',
+        to: 'worktree',
+        cwd: repo,
+      });
+
+      expect(changes).toEqual(
+        expect.arrayContaining([
+          { status: 'modified', path: 'staged.ts' },
+          { status: 'modified', path: 'unstaged.ts' },
+          { status: 'added', path: 'untracked.ts' },
+        ]),
+      );
+
+      expect(changes).toHaveLength(3);
+    } finally {
+      await rm(repo, { recursive: true, force: true });
+    }
+  });
+
+  it('detects deleted files', async () => {
+    const repo = await mkdtemp(join(tmpdir(), 'force-worktree-test-'));
+
+    const git = (args: string[]) =>
+      execFileSync('git', args, {
+        cwd: repo,
+        encoding: 'utf8',
+      }).trim();
+
+    try {
+      // Initialize the temporary repository.
+      git(['init', '-q']);
+      git(['config', 'user.name', 'Forge Test']);
+      git(['config', 'user.email', 'forge@example.invalid']);
+      git(['config', 'commit.gpgsign', 'false']);
+
+      await writeFile(join(repo, 'staged.ts'), 'version 1\n');
+      await writeFile(join(repo, 'unstaged.ts'), 'version 1\n');
+      await writeFile(join(repo, 'deleted.ts'), 'delete me\n');
+      await writeFile(join(repo, '.gitignore'), 'ignored.ts\n');
+
+      git(['add', '-A']);
+      git(['commit', '-qm', 'Initial commit']);
+
+      // Delete the file without staging or commiting.
+      await rm(join(repo, 'deleted.ts'));
+
+      const changes = await getGitChanges({
+        from: 'HEAD',
+        to: 'worktree',
+        cwd: repo,
+      });
+
+      expect(changes).toEqual(expect.arrayContaining([{ status: 'deleted', path: 'deleted.ts' }]));
+    } finally {
+      await rm(repo, { recursive: true, force: true });
+    }
+  });
 });
