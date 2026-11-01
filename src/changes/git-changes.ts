@@ -40,6 +40,28 @@ export async function getGitChanges(
     throw new Error('Invalid Git revision');
   }
 
+  if (to === 'worktree') {
+    if (mergeBase) {
+      throw new Error('Merge-base comparison is not supported for worktree');
+    }
+
+    const trackedOutput = await execute(['diff', '--name-status', '-z', '--find-renames', from, '--'], cwd);
+
+    const untrackedOutput = await execute(['ls-files', '--others', '--exclude-standard', '-z'], cwd);
+
+    const trackedChanges = parseGitChanges(trackedOutput);
+
+    const untrackChanges: GitChange[] = untrackedOutput
+      .split('\0')
+      .filter(Boolean)
+      .map((path) => ({
+        status: 'added',
+        path,
+      }));
+
+    return [...trackedChanges, ...untrackChanges];
+  }
+
   const revisions = mergeBase ? [`${from}...${to}`] : [from, to];
 
   const output = await execute(['diff', '--name-status', '-z', '--find-renames', ...revisions, '--'], cwd);
