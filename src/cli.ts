@@ -5,18 +5,26 @@ import { planTestSelection } from './selection/plan-test-selection.js';
 import { createVitestRunner } from './execution/vitest-runner.js';
 
 import type { TestRunner } from './execution/test-runner.js';
+import type { ValidationTarget } from './validation/validation-target.js';
 
-interface CliServices {
+interface LegacyCliServices {
   discoverTestFiles: typeof discoverVitestTestFiles;
   planSelection: typeof planTestSelection;
   runner?: TestRunner;
 }
+
+interface TargetCliServices {
+  targets: ValidationTarget[];
+}
+
+type CliServices = LegacyCliServices | TargetCliServices;
 
 const defaultServices: CliServices = {
   discoverTestFiles: discoverVitestTestFiles,
   planSelection: planTestSelection,
   runner: createVitestRunner(),
 };
+
 
 export async function main(
   args = process.argv.slice(2),

@@ -481,6 +481,11 @@ describe('main', () => {
       process.cwd(),
     );
 
+    expect(mavenRunner.run).toHaveBeenCalledExactlyOnceWith(
+      [javaTest],
+      process.cwd(),
+    );
+
     expect(vitestTarget.discoverTestFiles).not.toHaveBeenCalled();
     expect(vitestRunner.run).not.toHaveBeenCalled()
 
