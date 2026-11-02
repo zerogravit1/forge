@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { runCommand } from './command-runner.js';
+import type { runCommand } from './command-runner.js';
 import { createMavenRunner } from './maven-runner.js';
 
 describe('createMavenRunner', () => {
