@@ -141,6 +141,16 @@ export async function main(
         const testFiles = await services.discoverTestFiles(repoRoot);
         const selection = await services.planSelection(changes, testFiles, repoRoot);
 
+        if (selection.unmappedChanges.length > 0) {
+          console.error('Selection incomplete. Execution requires a fallback policy.');
+          return 1;
+        }
+        
+        if (selection.selectedTests.length === 0) {
+          process.stdout.write('No tests selected.\n');
+          return 0;
+        }
+
         const runner = services.runner ?? createVitestRunner();
         const result = await runner.run(selection.selectedTests, repoRoot);
 
