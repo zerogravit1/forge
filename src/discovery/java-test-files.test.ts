@@ -19,11 +19,7 @@ describe('discoverJavaTestFiles', () => {
     const repo = await mkdtemp(join(tmpdir(), 'forge-java-discovery-'));
     const projectPath = 'java-orders';
 
-    const testDirectory = join(
-      repo,
-      projectPath,
-      'src/test/java/com/forge/orders',
-    );
+    const testDirectory = join(repo, projectPath, 'src/test/java/com/forge/orders');
 
     try {
       await mkdir(testDirectory, { recursive: true });
@@ -43,7 +39,7 @@ describe('discoverJavaTestFiles', () => {
         'java-orders/src/test/java/com/forge/orders/OrderTests.java',
         'java-orders/src/test/java/com/forge/orders/TestOrders.java',
       ]);
-    }finally {
+    } finally {
       await rm(repo, { recursive: true, force: true });
     }
   });

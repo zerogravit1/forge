@@ -9,11 +9,7 @@ export interface ValdiationTarget {
 
   discoverTestFiles(repoRoot: string): Promise<string[]>;
 
-  planSelection(
-    changes: GitChange[],
-    testFiles: string[],
-    repoRoot: string,
-  ): Promise<SelectionResult>;
+  planSelection(changes: GitChange[], testFiles: string[], repoRoot: string): Promise<SelectionResult>;
 
   readonly runner: TestRunner;
 }
