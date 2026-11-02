@@ -475,19 +475,12 @@ describe('main', () => {
 
     expect(javaTarget.discoverTestFiles).toHaveBeenCalledExactlyOnceWith(process.cwd());
 
-    expect(javaTarget.planSelection).toHaveBeenCalledExactlyOnceWith(
-      [change],
-      [javaTest],
-      process.cwd(),
-    );
+    expect(javaTarget.planSelection).toHaveBeenCalledExactlyOnceWith([change], [javaTest], process.cwd());
 
-    expect(mavenRunner.run).toHaveBeenCalledExactlyOnceWith(
-      [javaTest],
-      process.cwd(),
-    );
+    expect(mavenRunner.run).toHaveBeenCalledExactlyOnceWith([javaTest], process.cwd());
 
     expect(vitestTarget.discoverTestFiles).not.toHaveBeenCalled();
-    expect(vitestRunner.run).not.toHaveBeenCalled()
+    expect(vitestRunner.run).not.toHaveBeenCalled();
 
     expect(exitCode).toBe(0);
   });

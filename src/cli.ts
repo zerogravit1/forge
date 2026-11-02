@@ -25,7 +25,6 @@ const defaultServices: CliServices = {
   runner: createVitestRunner(),
 };
 
-
 export async function main(
   args = process.argv.slice(2),
   getChanges = getGitChanges,
@@ -46,9 +45,7 @@ export async function main(
         const repoRoot = process.cwd();
 
         const testFiles = await services.discoverTestFiles(repoRoot);
-
         const selection = await services.planSelection(changes, testFiles, repoRoot);
-
         const fileLabel = changes.length === 1 ? 'file' : 'files';
 
         process.stdout.write(`Detected ${changes.length} changed ${fileLabel}:\n`);
@@ -99,18 +96,50 @@ export async function main(
         }
 
         const repoRoot = process.cwd();
+
+        if ('targets' in services) {
+          const unmatchedChanges = changes.filter(
+            (change) => !services.targets.some((target) => target.includesChange(change)),
+          );
+
+          if (unmatchedChanges.length > 0) {
+            console.error('Selection incomplete. Some changes have no validation target.');
+            return 1;
+          }
+
+          const matchingTargets = services.targets.filter((target) =>
+            changes.some((change) => target.includesChange(change)),
+          );
+
+          if (matchingTargets.length !== 1) {
+            console.error('Expected exactly one matching validation target');
+            return 1;
+          }
+
+          const target = matchingTargets[0]!;
+
+          const targetChanges = changes.filter((change) => target.includesChange(change));
+
+          const testFiles = await target.discoverTestFiles(repoRoot);
+          const selection = await target.planSelection(targetChanges, testFiles, repoRoot);
+
+          if (selection.unmappedChanges.length > 0) {
+            console.error('Selection incomplete. Execution requires a fallback policy.');
+            return 1;
+          }
+
+          if (selection.selectedTests.length === 0) {
+            process.stdout.write('No tests selected.\n');
+            return 0;
+          }
+
+          const result = await target.runner.run(selection.selectedTests, repoRoot);
+
+          return result.exitCode;
+        }
+
         const testFiles = await services.discoverTestFiles(repoRoot);
         const selection = await services.planSelection(changes, testFiles, repoRoot);
-
-        if (selection.unmappedChanges.length > 0) {
-          console.error('Selection incomplete. Execution requires a fallback policy.');
-          return 1;
-        }
-
-        if (selection.selectedTests.length === 0) {
-          process.stdout.write('No tests selected.\n');
-          return 0;
-        }
 
         const runner = services.runner ?? createVitestRunner();
         const result = await runner.run(selection.selectedTests, repoRoot);
