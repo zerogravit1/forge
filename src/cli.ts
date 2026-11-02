@@ -44,6 +44,11 @@ export async function main(
 
         const repoRoot = process.cwd();
 
+        if ('target' in services) {
+          console.error('Target-based planning is not implemented yet.');
+          return 1;
+        }
+
         const testFiles = await services.discoverTestFiles(repoRoot);
         const selection = await services.planSelection(changes, testFiles, repoRoot);
         const fileLabel = changes.length === 1 ? 'file' : 'files';
@@ -145,7 +150,7 @@ export async function main(
           console.error('Selection incomplete. Execution requires a fallback policy.');
           return 1;
         }
-        
+
         if (selection.selectedTests.length === 0) {
           process.stdout.write('No tests selected.\n');
           return 0;

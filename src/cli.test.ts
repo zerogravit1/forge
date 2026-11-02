@@ -484,4 +484,29 @@ describe('main', () => {
 
     expect(exitCode).toBe(0);
   });
+
+  it('does not execute Java tests when another change has no validation target', async () => {
+    const getChanges = vi.fn(async () => [
+      {
+        status: 'modified' as const,
+        path: 'examples/java-orders/src/main/java/com/forge/orders/OrderService.java',
+      },
+      {
+        status: 'modified' as const,
+        path: 'unmapped/unknown-file.txt',
+      },
+    ]);
+
+    const stderr = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const exitCode = await main(['run'], getChanges, {
+      targets: [vitestTarget, javaTarget],
+    });
+
+    expect(exitCode).toBe(1);
+    expect(mavenRunner.run).not.toHaveBeenCalled();
+    expect(vitestRunner.run).not.toHaveBeenCalled();
+
+    expect(stderr).toHaveBeenCalledWith('Selection incomplete. Some changes have no validation target.');
+  });
 });
