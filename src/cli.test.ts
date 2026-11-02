@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { main } from './cli.js';
+import type { ValidationTarget } from './validation/validation-target.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -12,6 +13,48 @@ const planSelection = vi.fn(async () => ({
   selectedTests: ['src/cli.test.ts'],
   unmappedChanges: [{ status: 'added' as const, path: 'src/new-file.ts' }],
 }));
+
+const javaTest = 'examples/java-orders/src/test/java/com/forge/orders/OrderServiceTest.java';
+
+const mavenRunner = {
+  id: 'maven',
+  run: vi.fn(async () => ({ exitCode: 0 })),
+};
+
+const javaTarget: ValidationTarget = {
+  id: 'java-orders',
+
+  includesChange: (change) => change.path.startsWith('examples/java-orders/'),
+
+  discoverTestFiles: vi.fn(async () => [javaTest]),
+
+  planSelection: vi.fn(async () => ({
+    selectedTests: [javaTest],
+    unmappedChanges: [],
+  })),
+
+  runner: mavenRunner,
+};
+
+const vitestRunner = {
+  id: 'vitest',
+  run: vi.fn(async () => ({ exitCode: 0 })),
+};
+
+const vitestTarget: ValidationTarget = {
+  id: 'vitest',
+
+  includesChange: (change) => change.path.startsWith('src/'),
+
+  discoverTestFiles: vi.fn(async () => ['src/cli.test.ts']),
+
+  planSelection: vi.fn(async () => ({
+    selectedTests: ['src/cli.test.ts'],
+    unmappedChanges: [],
+  })),
+
+  runner: vitestRunner,
+};
 
 describe('main', () => {
   it('reports when no changes are detected', async () => {
@@ -416,5 +459,31 @@ describe('main', () => {
     expect(exitCode).toBe(1);
 
     expect(stderr).toHaveBeenCalledWith('Selection incomplete. Execution requires a fallback policy.');
+  });
+
+  it('executes Java tests through the matching validation target', async () => {
+    const change = {
+      status: 'modified' as const,
+      path: 'examples/java-orders/src/main/java/com/forge/orders/OrderService.java',
+    };
+
+    const getChanges = vi.fn(async () => [change]);
+
+    const exitCode = await main(['run'], getChanges, {
+      targets: [vitestTarget, javaTarget],
+    });
+
+    expect(javaTarget.discoverTestFiles).toHaveBeenCalledExactlyOnceWith(process.cwd());
+
+    expect(javaTarget.planSelection).toHaveBeenCalledExactlyOnceWith(
+      [change],
+      [javaTest],
+      process.cwd(),
+    );
+
+    expect(vitestTarget.discoverTestFiles).not.toHaveBeenCalled();
+    expect(vitestRunner.run).not.toHaveBeenCalled()
+
+    expect(exitCode).toBe(0);
   });
 });
