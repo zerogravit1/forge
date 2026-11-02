@@ -44,7 +44,7 @@ export async function main(
 
         const repoRoot = process.cwd();
 
-        if ('target' in services) {
+        if ('targets' in services) {
           console.error('Target-based planning is not implemented yet.');
           return 1;
         }
@@ -121,26 +121,29 @@ export async function main(
             return 1;
           }
 
-          const target = matchingTargets[0]!;
+          // const target = matchingTargets[0]!;
 
-          const targetChanges = changes.filter((change) => target.includesChange(change));
+          for (const target of matchingTargets) {
+            const targetChanges = changes.filter((change) => target.includesChange(change));
 
-          const testFiles = await target.discoverTestFiles(repoRoot);
-          const selection = await target.planSelection(targetChanges, testFiles, repoRoot);
+            const testFiles = await target.discoverTestFiles(repoRoot);
 
-          if (selection.unmappedChanges.length > 0) {
-            console.error('Selection incomplete. Execution requires a fallback policy.');
-            return 1;
+            const selection = await target.planSelection(targetChanges, testFiles, repoRoot);
+
+            if (selection.unmappedChanges.length > 0) {
+              console.error('Selection incomplete. Execution requires a fallback policy.');
+              return 1;
+            }
+
+            if (selection.selectedTests.length === 0) {
+              process.stdout.write('No tests selected.\n');
+              return 0;
+            }
+
+            const result = await target.runner.run(selection.selectedTests, repoRoot);
+
+            return result.exitCode;
           }
-
-          if (selection.selectedTests.length === 0) {
-            process.stdout.write('No tests selected.\n');
-            return 0;
-          }
-
-          const result = await target.runner.run(selection.selectedTests, repoRoot);
-
-          return result.exitCode;
         }
 
         const testFiles = await services.discoverTestFiles(repoRoot);
