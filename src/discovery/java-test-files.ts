@@ -1,10 +1,7 @@
 import { glob } from 'node:fs/promises';
 import { join, relative, resolve, sep } from 'node:path';
 
-export async function discoverJavaTestFiles(
-  repoRoot: string,
-  projectPath: string,
-): Promise<string[]> {
+export async function discoverJavaTestFiles(repoRoot: string, projectPath: string): Promise<string[]> {
   const testRoot = join(repoRoot, projectPath, 'src/test/java');
   const testFiles: string[] = [];
 

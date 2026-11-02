@@ -3,10 +3,7 @@ import { discoverJavaTestFiles } from './java-test-files.js';
 
 describe('discoverJavaTestFiles', () => {
   it('discover Java test files in a Maven project', async () => {
-    const testFiles = await discoverJavaTestFiles(
-      process.cwd(),
-      'examples/java-orders',
-    );
+    const testFiles = await discoverJavaTestFiles(process.cwd(), 'examples/java-orders');
 
     expect(testFiles).toEqual([
       'examples/java-orders/src/test/java/com/forge/inventory/InventoryServiceTest.java',

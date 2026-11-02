@@ -3,10 +3,7 @@ import { basename, join } from 'node:path';
 import type { TestRunner } from './test-runner.js';
 import { runCommand } from './command-runner.js';
 
-export function createMavenRunner(
-  projectPath: string,
-  execute: typeof runCommand = runCommand,
-): TestRunner {
+export function createMavenRunner(projectPath: string, execute: typeof runCommand = runCommand): TestRunner {
   return {
     id: 'maven',
 
@@ -19,12 +16,7 @@ export function createMavenRunner(
 
       const exitCode = await execute(
         'mvn',
-        [
-          '-f',
-          join(projectPath, 'pom.xml'),
-          `-Dtest=${testClasses.join(',')}`,
-          'test',
-        ],
+        ['-f', join(projectPath, 'pom.xml'), `-Dtest=${testClasses.join(',')}`, 'test'],
         repoRoot,
       );
 
