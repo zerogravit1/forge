@@ -114,68 +114,30 @@ export async function main(
 
         const repoRoot = process.cwd();
 
-        let selection: SelectionResult;
-
         if ('targets' in services) {
-          const result = await planValidationTargets(changes, services.targets, repoRoot);
+          const { plans, unmatchedChanges } = await planValidationTargets(changes, services.targets, repoRoot);
 
-          selection = {
-            selectedTests: result.plans.flatMap((plan) => plan.selection.selectedTests),
-            unmappedChanges: [
-              ...result.unmatchedChanges,
-              ...result.plans.flatMap((plan) => plan.selection.unmappedChanges),
-            ],
-          };
-        } else {
+          if (unmatchedChanges.length > 0) {
+            console.error('Selection incomplete. Some changes have no validation target.');
+            return 1;
+          }
 
-        }
-          // const unmatchedChanges = changes.filter(
-          //   (change) => !services.targets.some((target) => target.includesChange(change)),
-          // );
-
-          // if (unmatchedChanges.length > 0) {
-          //   console.error('Selection incomplete. Some changes have no validation target.');
-          //   return 1;
-          // }
-
-          // const matchingTargets = services.targets.filter((target) =>
-          //   changes.some((change) => target.includesChange(change)),
-          // );
-
-          const plans: Array<{
-            target: ValidationTarget;
-            selectedTests: string[];
-          }> = [];
-
-          for (const target of matchingTargets) {
-            const targetChanges = changes.filter((change) => target.includesChange(change));
-
-            const testFiles = await target.discoverTestFiles(repoRoot);
-
-            const selection = await target.planSelection(targetChanges, testFiles, repoRoot);
-
-            if (selection.unmappedChanges.length > 0) {
-              console.error('Selection incomplete. Execution requires a fallback policy.');
-              return 1;
-            }
-
-            plans.push({
-              target,
-              selectedTests: selection.selectedTests,
-            });
+          if (plans.some((plan) => plan.selection.unmappedChanges.length > 0)) {
+            console.error('Selection incomplete. Execution requires a fallback policy.');
+            return 1;
           }
 
           let exitCode = 0;
           let executed = false;
 
           for (const plan of plans) {
-            if (plan.selectedTests.length === 0) {
+            if (plan.selection.selectedTests.length === 0) {
               continue;
             }
 
             executed = true;
 
-            const result = await plan.target.runner.run(plan.selectedTests, repoRoot);
+            const result = await plan.target.runner.run(plan.selection.selectedTests, repoRoot);
 
             if (result.exitCode !== 0) {
               exitCode = 1;
