@@ -553,6 +553,33 @@ describe('main', () => {
     expect(exitCode).toBe(1);
   });
 
+  it('plans Java tests through the matching validation target', async () => {
+    const change = {
+      status: 'modified' as const,
+      path: 'examples/java-orders/src/main/java/com/forge/orders/OrderService.java',
+    };
+
+    const getChanges = vi.fn(async () => [change]);
+
+    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    const exitCode = await main(['plan'], getChanges, {
+      targets: [vitestTarget, javaTarget],
+    });
+
+    expect(javaTarget.discoverTestFiles).toHaveBeenCalledExactlyOnceWith(process.cwd());
+    expect(javaTarget.planSelection).toHaveBeenCalledExactlyOnceWith([change], [javaTest], process.cwd());
+
+    expect(vitestTarget.discoverTestFiles).not.toHaveBeenCalled();
+
+    expect(stdout).toHaveBeenCalledWith('  ' + javaTest + '\n');
+
+    expect(mavenRunner.run).not.toHaveBeenCalled();
+    expect(vitestRunner.run).not.toHaveBeenCalled();
+
+    expect(exitCode).toBe(0);
+  });
+
   it('does not execute Java tests when another change has no validation target', async () => {
     const getChanges = vi.fn(async () => [
       {
