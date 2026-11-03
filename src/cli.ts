@@ -6,6 +6,8 @@ import { createVitestRunner } from './execution/vitest-runner.js';
 
 import type { TestRunner } from './execution/test-runner.js';
 import type { ValidationTarget } from './validation/validation-target.js';
+import { planValidationTargets } from './validation/plan-validation-targets.js';
+import type { SelectionResult } from './selection/select-tests.js';
 
 interface LegacyCliServices {
   discoverTestFiles: typeof discoverVitestTestFiles;
@@ -44,13 +46,33 @@ export async function main(
 
         const repoRoot = process.cwd();
 
+        let selection: SelectionResult;
+
         if ('targets' in services) {
-          console.error('Target-based planning is not implemented yet.');
-          return 1;
+          // console.error('Target-based planning is not implemented yet.');
+          // return 1;
+          const result = await planValidationTargets(
+            changes,
+            services.targets,
+            repoRoot,
+          );
+
+          selection = {
+            selectedTests: result.plans.flatMap(
+              (plan) => plan.selection.selectedTests,
+            ),
+            unmappedChanges: [
+              ...result.unmatchedChanges,
+              ...result.plans.flatMap(
+                (plan) => plan.selection.unmappedChanges,
+              ),
+            ],
+          };
+        } else {
+          const testFiles = await services.discoverTestFiles(repoRoot);
+          selection = await services.planSelection(changes, testFiles, repoRoot);
         }
 
-        const testFiles = await services.discoverTestFiles(repoRoot);
-        const selection = await services.planSelection(changes, testFiles, repoRoot);
         const fileLabel = changes.length === 1 ? 'file' : 'files';
 
         process.stdout.write(`Detected ${changes.length} changed ${fileLabel}:\n`);
