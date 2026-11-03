@@ -49,8 +49,6 @@ export async function main(
         let selection: SelectionResult;
 
         if ('targets' in services) {
-          // console.error('Target-based planning is not implemented yet.');
-          // return 1;
           const result = await planValidationTargets(changes, services.targets, repoRoot);
 
           selection = {
@@ -116,19 +114,33 @@ export async function main(
 
         const repoRoot = process.cwd();
 
+        let selection: SelectionResult;
+
         if ('targets' in services) {
-          const unmatchedChanges = changes.filter(
-            (change) => !services.targets.some((target) => target.includesChange(change)),
-          );
+          const result = await planValidationTargets(changes, services.targets, repoRoot);
 
-          if (unmatchedChanges.length > 0) {
-            console.error('Selection incomplete. Some changes have no validation target.');
-            return 1;
-          }
+          selection = {
+            selectedTests: result.plans.flatMap((plan) => plan.selection.selectedTests),
+            unmappedChanges: [
+              ...result.unmatchedChanges,
+              ...result.plans.flatMap((plan) => plan.selection.unmappedChanges),
+            ],
+          };
+        } else {
 
-          const matchingTargets = services.targets.filter((target) =>
-            changes.some((change) => target.includesChange(change)),
-          );
+        }
+          // const unmatchedChanges = changes.filter(
+          //   (change) => !services.targets.some((target) => target.includesChange(change)),
+          // );
+
+          // if (unmatchedChanges.length > 0) {
+          //   console.error('Selection incomplete. Some changes have no validation target.');
+          //   return 1;
+          // }
+
+          // const matchingTargets = services.targets.filter((target) =>
+          //   changes.some((change) => target.includesChange(change)),
+          // );
 
           const plans: Array<{
             target: ValidationTarget;
