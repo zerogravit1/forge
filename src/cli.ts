@@ -116,7 +116,10 @@ export async function main(
             changes.some((change) => target.includesChange(change)),
           );
 
-          const plans = [];
+          const plans: Array<{
+            target: ValidationTarget;
+            selectedTests: string[];
+           }> = [];
 
           // if (matchingTargets.length !== 1) {
           //   console.error('Expected exactly one matching validation target');
@@ -137,19 +140,37 @@ export async function main(
               return 1;
             }
 
-            if (selection.selectedTests.length === 0) {
-              process.stdout.write('No tests selected.\n');
-              return 0;
-            }
-
-            const result = await target.runner.run(selection.selectedTests, repoRoot);
-
-            // return result.exitCode;
+            plans.push({
+              target,
+              selectedTests: selection.selectedTests,
+            });
           }
+
+          let exitCode = 0;
+          let executed = false;
 
           for (const plan of plans) {
-            
+            if (plan.selectedTests.length === 0) {
+              continue;
+            }
+
+            executed = true;
+
+            const result = await plan.target.runner.run(
+              plan.selectedTests,
+              repoRoot,
+            );
+
+            if (result.exitCode !== 0) {
+              exitCode = 1;
+            }
           }
+
+          if (!executed) {
+            process.stdout.write('No tests selected.\n');
+          }
+
+          return exitCode;
         }
 
         const testFiles = await services.discoverTestFiles(repoRoot);
