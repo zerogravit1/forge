@@ -518,6 +518,41 @@ describe('main', () => {
     expect(exitCode).toBe(0);
   });
 
+  it('returns a nonzero exit code when one validation target fails', async () => {
+    const changes = [
+      {
+        status: 'modified' as const,
+        path: 'src/cli.ts',
+      },
+      {
+        status: 'modified' as const,
+        path: 'examples/java-orders/src/main/java/com/forge/orders/OrderService.java',
+      },
+    ];
+
+    const getChanges = vi.fn(async () => changes);
+
+    const failingVitestRunner = {
+      id: 'vitest',
+      run: vi.fn(async () => ({ exitCode: 1 })),
+    };
+
+    const failingVitestTarget: ValidationTarget = {
+      ...vitestTarget,
+      runner: failingVitestRunner,
+    };
+
+    const exitCode = await main(['run'], getChanges, {
+      targets: [failingVitestTarget, javaTarget],
+    });
+
+    expect(failingVitestRunner.run).toHaveBeenCalledExactlyOnceWith(['src/cli.test.ts'], process.cwd());
+
+    expect(mavenRunner.run).toHaveBeenCalledExactlyOnceWith([javaTest], process.cwd());
+
+    expect(exitCode).toBe(1);
+  });
+
   it('does not execute Java tests when another change has no validation target', async () => {
     const getChanges = vi.fn(async () => [
       {
