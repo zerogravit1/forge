@@ -51,21 +51,13 @@ export async function main(
         if ('targets' in services) {
           // console.error('Target-based planning is not implemented yet.');
           // return 1;
-          const result = await planValidationTargets(
-            changes,
-            services.targets,
-            repoRoot,
-          );
+          const result = await planValidationTargets(changes, services.targets, repoRoot);
 
           selection = {
-            selectedTests: result.plans.flatMap(
-              (plan) => plan.selection.selectedTests,
-            ),
+            selectedTests: result.plans.flatMap((plan) => plan.selection.selectedTests),
             unmappedChanges: [
               ...result.unmatchedChanges,
-              ...result.plans.flatMap(
-                (plan) => plan.selection.unmappedChanges,
-              ),
+              ...result.plans.flatMap((plan) => plan.selection.unmappedChanges),
             ],
           };
         } else {
