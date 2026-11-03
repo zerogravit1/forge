@@ -554,10 +554,7 @@ describe('main', () => {
       path: 'examples/java-orders/src/main/java/com/forge/orders/OrderService.java',
     };
 
-    const getChanges = vi.fn(async () => [
-      typescriptChange,
-      javaChange,
-    ]);
+    const getChanges = vi.fn(async () => [typescriptChange, javaChange]);
 
     const incompleteJavaTarget: ValidationTarget = {
       ...javaTarget,
@@ -567,8 +564,7 @@ describe('main', () => {
       })),
     };
 
-    const stderr = vi.spyOn(console, 'error')
-      .mockImplementation(() => {});
+    const stderr = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const exitCode = await main(['run'], getChanges, {
       targets: [vitestTarget, incompleteJavaTarget],
@@ -580,8 +576,8 @@ describe('main', () => {
     expect(vitestRunner.run).not.toHaveBeenCalled();
     expect(mavenRunner.run).not.toHaveBeenCalled();
 
-    expect(exitCode).toHaveBeenCalledWith(
-      'Selection incomplete. Execution requires a fallback policy.'
-    );
+    expect(exitCode).toBe(1);
+
+    expect(stderr).toHaveBeenCalledWith('Selection incomplete. Execution requires a fallback policy.');
   });
 });

@@ -119,7 +119,7 @@ export async function main(
           const plans: Array<{
             target: ValidationTarget;
             selectedTests: string[];
-           }> = [];
+          }> = [];
 
           for (const target of matchingTargets) {
             const targetChanges = changes.filter((change) => target.includesChange(change));
@@ -149,10 +149,7 @@ export async function main(
 
             executed = true;
 
-            const result = await plan.target.runner.run(
-              plan.selectedTests,
-              repoRoot,
-            );
+            const result = await plan.target.runner.run(plan.selectedTests, repoRoot);
 
             if (result.exitCode !== 0) {
               exitCode = 1;
