@@ -542,4 +542,46 @@ describe('main', () => {
 
     expect(stderr).toHaveBeenCalledWith('Selection incomplete. Some changes have no validation target.');
   });
+
+  it('does not execute any target when another target has unmapped changes', async () => {
+    const typescriptChange = {
+      status: 'modified' as const,
+      path: 'src/cli.ts',
+    };
+
+    const javaChange = {
+      status: 'modified' as const,
+      path: 'examples/java-orders/src/main/java/com/forge/orders/OrderService.java',
+    };
+
+    const getChanges = vi.fn(async () => [
+      typescriptChange,
+      javaChange,
+    ]);
+
+    const incompleteJavaTarget: ValidationTarget = {
+      ...javaTarget,
+      planSelection: vi.fn(async () => ({
+        selectedTests: [javaTest],
+        unmappedChanges: [javaChange],
+      })),
+    };
+
+    const stderr = vi.spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    const exitCode = await main(['run'], getChanges, {
+      targets: [vitestTarget, incompleteJavaTarget],
+    });
+
+    expect(vitestTarget.planSelection).toHaveBeenCalledOnce();
+    expect(incompleteJavaTarget.planSelection).toHaveBeenCalledOnce();
+
+    expect(vitestRunner.run).not.toHaveBeenCalled();
+    expect(mavenRunner.run).not.toHaveBeenCalled();
+
+    expect(exitCode).toHaveBeenCalledWith(
+      'Selection incomplete. Execution requires a fallback policy.'
+    );
+  });
 });

@@ -121,13 +121,6 @@ export async function main(
             selectedTests: string[];
            }> = [];
 
-          // if (matchingTargets.length !== 1) {
-          //   console.error('Expected exactly one matching validation target');
-          //   return 1;
-          // }
-
-          // const target = matchingTargets[0]!;
-
           for (const target of matchingTargets) {
             const targetChanges = changes.filter((change) => target.includesChange(change));
 
