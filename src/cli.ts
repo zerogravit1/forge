@@ -116,10 +116,12 @@ export async function main(
             changes.some((change) => target.includesChange(change)),
           );
 
-          if (matchingTargets.length !== 1) {
-            console.error('Expected exactly one matching validation target');
-            return 1;
-          }
+          const plans = [];
+
+          // if (matchingTargets.length !== 1) {
+          //   console.error('Expected exactly one matching validation target');
+          //   return 1;
+          // }
 
           // const target = matchingTargets[0]!;
 
@@ -142,7 +144,11 @@ export async function main(
 
             const result = await target.runner.run(selection.selectedTests, repoRoot);
 
-            return result.exitCode;
+            // return result.exitCode;
+          }
+
+          for (const plan of plans) {
+            
           }
         }
 
