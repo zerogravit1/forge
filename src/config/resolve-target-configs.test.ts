@@ -51,4 +51,34 @@ describe('resolveTargetConfigs', () => {
       'Unknown root: examples.unknown',
     );
   });
+
+  it('rejects a target referencing an unknown adapter', () => {
+    const config: ForgeConfig = {
+      version: '1.0.0',
+      roots: {
+        examples: {
+          'java-orders': {
+            path: 'examples/java-orders',
+            sources: ['src/main/java'],
+            tests: ['src/test/java'],
+          },
+        },
+      },
+      adapters: {},
+      runners: {},
+      targets: {
+        examples: {
+          'java-orders-tests': {
+            root: 'examples.java-orders',
+            adapter: ['java'],
+            runner: [],
+          },
+        },
+      },
+    };
+
+    expect(() => resolveTargetConfigs(config)).toThrow(
+      'Unknown adapter: java',
+    );
+  });
 });

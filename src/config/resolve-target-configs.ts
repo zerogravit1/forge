@@ -10,13 +10,19 @@ export function resolveTargetConfigs(config: ForgeConfig): ResolvedTargetConfig[
       const [rootNamespace, rootName] = target.root.split('.');
 
       if (!rootNamespace || !rootName) {
-        throw new Error('Unknown root: ${target.root');
+        throw new Error(`Unknown root: ${target.root}`);
       }
 
       const root = config.roots[rootNamespace]?.[rootName];
 
       if (!root) {
         throw new Error(`Unknown root: ${target.root}`);
+      }
+
+      for (const adapter of target.adapter) {
+        if (!Object.hasOwn(config.adapters, adapter)) {
+          throw new Error(`Unknown adapter: ${adapter}`);
+        }
       }
 
       resolved.push({
