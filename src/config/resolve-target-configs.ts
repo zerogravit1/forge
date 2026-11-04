@@ -7,11 +7,13 @@ export function resolveTargetConfigs(config: ForgeConfig): ResolvedTargetConfig[
     for (const [name, target] of Object.entries(targets)) {
       const id = `${namespace}.${name}`;
 
-      const [rootNamespace, rootName] = target.root.split('.');
+      const parts = target.root.split('.');
 
-      if (!rootNamespace || !rootName) {
+      if (parts.length !== 2 || parts.some((part) => !part)) {
         throw new Error(`Unknown root: ${target.root}`);
       }
+
+      const [rootNamespace, rootName] = parts;
 
       const root = config.roots[rootNamespace]?.[rootName];
 
