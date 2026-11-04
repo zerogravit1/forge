@@ -11,3 +11,7 @@ export async function loadForgeConfig(repoRoot: string): Promise<ForgeConfig> {
 
   return validateForgeConfig(parsed);
 }
+
+export function validateForgeConfig(parsedConfig: unknown) {
+  return parsedConfig;
+}
