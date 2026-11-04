@@ -47,9 +47,7 @@ describe('resolveTargetConfigs', () => {
       },
     };
 
-    expect(() => resolveTargetConfigs(config)).toThrow(
-      'Unknown root: examples.unknown',
-    );
+    expect(() => resolveTargetConfigs(config)).toThrow('Unknown root: examples.unknown');
   });
 
   it('rejects a target referencing an unknown adapter', () => {
@@ -77,9 +75,7 @@ describe('resolveTargetConfigs', () => {
       },
     };
 
-    expect(() => resolveTargetConfigs(config)).toThrow(
-      'Unknown adapter: java',
-    );
+    expect(() => resolveTargetConfigs(config)).toThrow('Unknown adapter: java');
   });
 
   it('rejects a target referencing an unknown runner', () => {
@@ -109,8 +105,19 @@ describe('resolveTargetConfigs', () => {
       },
     };
 
-    expect(() => resolveTargetConfigs(config)).toThrow(
-      'Unknown runner: maven',
-    );
+    expect(() => resolveTargetConfigs(config)).toThrow('Unknown runner: maven');
+  });
+
+  it('rejects malformed root references', async () => {
+    const config = await loadForgeConfig(process.cwd());
+
+    const target = config.targets.examples?.['java-orders-tests'];
+    if (!target) {
+      throw new Error('Missing Java target fixture');
+    }
+
+    target.root = 'examples.java-orders.extra';
+
+    expect(() => resolveTargetConfigs(config)).toThrow('Unknown root: examples.java-orders.extra');
   });
 });
