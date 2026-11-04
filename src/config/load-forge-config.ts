@@ -55,7 +55,7 @@ function isStringArray(value: unknown): value is string[] {
 
 function validateRoots(value: unknown): ForgeConfig['roots'] {
   if (!isRecord(value)) {
-    throw new Error('Isvalid Forget configuration: roots must be an object');
+    throw new Error('Invalid Forge configuration: roots must be an object');
   }
 
   const roots: ForgeConfig['roots'] = {};
@@ -88,8 +88,77 @@ function validateRoots(value: unknown): ForgeConfig['roots'] {
   return roots;
 }
 
-function validateAdapters(value: unknown): ForgeConfig['adapters'] {}
+function validateAdapters(value: unknown): ForgeConfig['adapters'] {
+  if (!isRecord(value)) {
+    throw new Error('Invalid Forge configuration: adapters must be an object');
+  }
 
-function validateRunners(value: unknown): ForgeConfig['runners'] {}
+  const adapters: ForgeConfig['adapters'] = {};
 
-function validateTargets(value: unknown): ForgeConfig['targets'] {}
+  for (const [name, adapter] of Object.entries(value)) {
+    if (!isRecord(adapter) || typeof adapter.type !== 'string') {
+      throw new Error(`Invalid Forge configuration: adapters.${name}`);
+    }
+
+    adapters[name] = {
+      type: adapter.type,
+    };
+  }
+
+  return adapters;
+}
+
+function validateRunners(value: unknown): ForgeConfig['runners'] {
+  if (!isRecord(value)) {
+    throw new Error('Invalid Forge configuration: runners must be an object');
+  }
+
+  const runners: ForgeConfig['runners'] = {};
+
+  for (const [name, runner] of Object.entries(value)) {
+    if (!isRecord(runner) || typeof runner.type !== 'string') {
+      throw new Error(`Invalid Forge configuration: runners.${name}`);
+    }
+
+    runners[name] = {
+      type: runner.type,
+    };
+  }
+
+  return runners;
+}
+
+function validateTargets(value: unknown): ForgeConfig['targets'] {
+  if (!isRecord(value)) {
+    throw new Error('Invalid Forge configuration: targets must be an object');
+  }
+
+  const targets: ForgeConfig['targets'] = {};
+
+  for (const [namespace, entries] of Object.entries(value)) {
+    if (!isRecord(entries)) {
+      throw new Error(`Invalid Forge configuration: targets.${namespace}`);
+    }
+
+    targets[namespace] = {};
+
+    for (const [name, target] of Object.entries(entries)) {
+      if (
+        !isRecord(target) ||
+        typeof target.root !== 'string' ||
+        !isStringArray(target.adapter) ||
+        !isStringArray(target.runner)
+      ) {
+        throw new Error(`Invalid Forge configuration: targets.${namespace}.${name}`);
+      }
+
+      targets[namespace][name] = {
+        root: target.root,
+        adapter: target.adapter,
+        runner: target.runner,
+      };
+    }
+  }
+
+  return targets;
+}
