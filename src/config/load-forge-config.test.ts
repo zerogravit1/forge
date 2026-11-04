@@ -34,4 +34,24 @@ describe('validateForgeConfig', () => {
       }),
     ).toThrow('Unsupported Forge configuration version');
   });
+
+  it('rejects invalid root definitions', () => {
+    const config = {
+      version: '1.0.0',
+      roots: {
+        internal: {
+          forge: {
+            path: 123,
+            sources: ['src'],
+            tests: ['src'],
+          },
+        },
+      },
+      adapters: {},
+      runners: {},
+      targets: {},
+    };
+
+    expect(() => validateForgeConfig(config)).toThrow('Invalid Forge configuration');
+  });
 });

@@ -20,15 +20,11 @@ export function validateForgeConfig(parsedConfig: unknown): ForgeConfig {
   objectValidator('roots', parsedConfig);
   objectValidator('adapters', parsedConfig);
   objectValidator('runners', parsedConfig);
-  objectValidator('targets', parsedConfig)
+  objectValidator('targets', parsedConfig);
 
-
-  // if (
-  //   !('version' in parsedConfig) ||
-  //   typeof parsedConfig.version !== 'string'
-  // ) {
-  //   throw new Error('Invalid Forge configuration');
-  // }
+  if (!('version' in parsedConfig) || typeof parsedConfig.version !== 'string') {
+    throw new Error('Invalid Forge configuration');
+  }
 
   if (parsedConfig.version !== '1.0.0') {
     throw new Error('Unsupported Forge configuration version');
@@ -36,30 +32,19 @@ export function validateForgeConfig(parsedConfig: unknown): ForgeConfig {
 
   return {
     version: parsedConfig.version,
-    roots: parsedConfig.roots,
-    adapters: parsedConfig.adapters,
-    runners: parsedConfig.runners,
-    targets: parsedConfig.targets
-  }
+    roots: validateRoots(parsedConfig.roots),
+    adapters: validateAdapters(parsedConfig.adapters),
+    runners: validateRunners(parsedConfig.runners),
+    targets: validateTargets(parsedConfig.targets),
+  };
 }
 
-function isRecord(
-  value: unknown,
-): value is Record<string, unknown> {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    !Array.isArray(value)
-  );
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function objectValidator(
-  objectName: string,
-  config: Record<string, unknown
-): void {
+function objectValidator(objectName: string, config: Record<string, unknown>): void {
   if (!isRecord(config[objectName])) {
-    throw new Error(
-      `Invalid Forge configuration: ${objectName} must be an object`
-    )
+    throw new Error(`Invalid Forge configuration: ${objectName} must be an object`);
   }
 }
