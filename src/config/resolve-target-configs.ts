@@ -6,6 +6,27 @@ export function resolveTargetConfigs(config: ForgeConfig): ResolvedTargetConfig[
   for (const [namespace, targets] of Object.entries(config.targets)) {
     for (const [name, target] of Object.entries(targets)) {
       const id = `${namespace}.${name}`;
+
+      const [rootNamespace, rootName] = target.root.split('.');
+
+      if (!rootNamespace || !rootName) {
+        throw new Error('Unknown root: ${target.root');
+      }
+
+      const root = config.roots[rootNamespace]?.[rootName];
+
+      if (!root) {
+        throw new Error(`Unknown root: ${target.root}`);
+      }
+
+      resolved.push({
+        id,
+        projectRoot: root.path,
+        sourceRoots: root.sources,
+        testRoots: root.tests,
+        adapters: target.adapter,
+        runners: target.runner,
+      });
     }
   }
 
