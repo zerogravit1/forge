@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { main } from './cli.js';
+import type { ValidationTarget } from './validation/validation-target.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -12,6 +13,48 @@ const planSelection = vi.fn(async () => ({
   selectedTests: ['src/cli.test.ts'],
   unmappedChanges: [{ status: 'added' as const, path: 'src/new-file.ts' }],
 }));
+
+const javaTest = 'examples/java-orders/src/test/java/com/forge/orders/OrderServiceTest.java';
+
+const mavenRunner = {
+  id: 'maven',
+  run: vi.fn(async () => ({ exitCode: 0 })),
+};
+
+const javaTarget: ValidationTarget = {
+  id: 'java-orders',
+
+  includesChange: (change) => change.path.startsWith('examples/java-orders/'),
+
+  discoverTestFiles: vi.fn(async () => [javaTest]),
+
+  planSelection: vi.fn(async () => ({
+    selectedTests: [javaTest],
+    unmappedChanges: [],
+  })),
+
+  runner: mavenRunner,
+};
+
+const vitestRunner = {
+  id: 'vitest',
+  run: vi.fn(async () => ({ exitCode: 0 })),
+};
+
+const vitestTarget: ValidationTarget = {
+  id: 'vitest',
+
+  includesChange: (change) => change.path.startsWith('src/'),
+
+  discoverTestFiles: vi.fn(async () => ['src/cli.test.ts']),
+
+  planSelection: vi.fn(async () => ({
+    selectedTests: ['src/cli.test.ts'],
+    unmappedChanges: [],
+  })),
+
+  runner: vitestRunner,
+};
 
 describe('main', () => {
   it('reports when no changes are detected', async () => {
@@ -413,6 +456,242 @@ describe('main', () => {
     });
 
     expect(runner.run).not.toHaveBeenCalled();
+    expect(exitCode).toBe(1);
+
+    expect(stderr).toHaveBeenCalledWith('Selection incomplete. Execution requires a fallback policy.');
+  });
+
+  it('executes Java tests through the matching validation target', async () => {
+    const change = {
+      status: 'modified' as const,
+      path: 'examples/java-orders/src/main/java/com/forge/orders/OrderService.java',
+    };
+
+    const getChanges = vi.fn(async () => [change]);
+
+    const exitCode = await main(['run'], getChanges, {
+      targets: [vitestTarget, javaTarget],
+    });
+
+    expect(javaTarget.discoverTestFiles).toHaveBeenCalledExactlyOnceWith(process.cwd());
+
+    expect(javaTarget.planSelection).toHaveBeenCalledExactlyOnceWith([change], [javaTest], process.cwd());
+
+    expect(mavenRunner.run).toHaveBeenCalledExactlyOnceWith([javaTest], process.cwd());
+
+    expect(vitestTarget.discoverTestFiles).not.toHaveBeenCalled();
+    expect(vitestRunner.run).not.toHaveBeenCalled();
+
+    expect(exitCode).toBe(0);
+  });
+
+  it('executes tests for multiple matching validation targets', async () => {
+    const javaChange = {
+      status: 'modified' as const,
+      path: 'examples/java-orders/src/main/java/com/forge/orders/OrderService.java',
+    };
+
+    const typescriptChange = {
+      status: 'modified' as const,
+      path: 'src/cli.ts',
+    };
+
+    const changes = [javaChange, typescriptChange];
+    const getChanges = vi.fn(async () => changes);
+
+    const exitCode = await main(['run'], getChanges, {
+      targets: [vitestTarget, javaTarget],
+    });
+
+    expect(javaTarget.planSelection).toHaveBeenCalledExactlyOnceWith([javaChange], [javaTest], process.cwd());
+
+    expect(vitestTarget.planSelection).toHaveBeenCalledExactlyOnceWith(
+      [typescriptChange],
+      ['src/cli.test.ts'],
+      process.cwd(),
+    );
+
+    expect(mavenRunner.run).toHaveBeenCalledExactlyOnceWith([javaTest], process.cwd());
+
+    expect(vitestRunner.run).toHaveBeenCalledExactlyOnceWith(['src/cli.test.ts'], process.cwd());
+
+    expect(exitCode).toBe(0);
+  });
+
+  it('returns a nonzero exit code when one validation target fails', async () => {
+    const changes = [
+      {
+        status: 'modified' as const,
+        path: 'src/cli.ts',
+      },
+      {
+        status: 'modified' as const,
+        path: 'examples/java-orders/src/main/java/com/forge/orders/OrderService.java',
+      },
+    ];
+
+    const getChanges = vi.fn(async () => changes);
+
+    const failingVitestRunner = {
+      id: 'vitest',
+      run: vi.fn(async () => ({ exitCode: 1 })),
+    };
+
+    const failingVitestTarget: ValidationTarget = {
+      ...vitestTarget,
+      runner: failingVitestRunner,
+    };
+
+    const exitCode = await main(['run'], getChanges, {
+      targets: [failingVitestTarget, javaTarget],
+    });
+
+    expect(failingVitestRunner.run).toHaveBeenCalledExactlyOnceWith(['src/cli.test.ts'], process.cwd());
+
+    expect(mavenRunner.run).toHaveBeenCalledExactlyOnceWith([javaTest], process.cwd());
+
+    expect(exitCode).toBe(1);
+  });
+
+  it('plans Java tests through the matching validation target', async () => {
+    const change = {
+      status: 'modified' as const,
+      path: 'examples/java-orders/src/main/java/com/forge/orders/OrderService.java',
+    };
+
+    const getChanges = vi.fn(async () => [change]);
+
+    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    const exitCode = await main(['plan'], getChanges, {
+      targets: [vitestTarget, javaTarget],
+    });
+
+    expect(javaTarget.discoverTestFiles).toHaveBeenCalledExactlyOnceWith(process.cwd());
+    expect(javaTarget.planSelection).toHaveBeenCalledExactlyOnceWith([change], [javaTest], process.cwd());
+
+    expect(vitestTarget.discoverTestFiles).not.toHaveBeenCalled();
+
+    expect(stdout).toHaveBeenCalledWith('  ' + javaTest + '\n');
+
+    expect(mavenRunner.run).not.toHaveBeenCalled();
+    expect(vitestRunner.run).not.toHaveBeenCalled();
+
+    expect(exitCode).toBe(0);
+  });
+
+  it('plans Java test using the default CLI services', async () => {
+    const change = {
+      status: 'modified' as const,
+      path: 'examples/java-orders/src/main/java/com/forge/orders/OrderService.java',
+    };
+
+    const getChanges = vi.fn(async () => [change]);
+
+    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    const exitCode = await main(['plan'], getChanges);
+
+    expect(stdout).toHaveBeenCalledWith('  ' + javaTest + '\n');
+
+    expect(exitCode).toBe(0);
+  });
+
+  it('reports selections and unmapped changes across multiple targets', async () => {
+    const changes = [
+      {
+        status: 'modified' as const,
+        path: 'src/cli.ts',
+      },
+      {
+        status: 'modified' as const,
+        path: 'examples/java-orders/src/main/java/com/forge/orders/OrderService.java',
+      },
+      {
+        status: 'added' as const,
+        path: 'unmapped/unknown-file.txt',
+      },
+    ];
+
+    const getChanges = vi.fn(async () => changes);
+    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    const exitCode = await main(['plan'], getChanges, {
+      targets: [vitestTarget, javaTarget],
+    });
+
+    expect(vitestTarget.planSelection).toHaveBeenCalledOnce();
+    expect(javaTarget.planSelection).toHaveBeenCalledOnce();
+
+    expect(stdout).toHaveBeenCalledWith('  src/cli.test.ts\n');
+    expect(stdout).toHaveBeenCalledWith(`  ${javaTest}\n`);
+    expect(stdout).toHaveBeenCalledWith('  added\tunmapped/unknown-file.txt\n');
+    expect(stdout).toHaveBeenCalledWith('\nSelection incomplete: 1 change has no known test mapping.\n');
+
+    expect(vitestRunner.run).not.toHaveBeenCalled();
+    expect(mavenRunner.run).not.toHaveBeenCalled();
+
+    expect(exitCode).toBe(0);
+  });
+
+  it('does not execute Java tests when another change has no validation target', async () => {
+    const getChanges = vi.fn(async () => [
+      {
+        status: 'modified' as const,
+        path: 'examples/java-orders/src/main/java/com/forge/orders/OrderService.java',
+      },
+      {
+        status: 'modified' as const,
+        path: 'unmapped/unknown-file.txt',
+      },
+    ]);
+
+    const stderr = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const exitCode = await main(['run'], getChanges, {
+      targets: [vitestTarget, javaTarget],
+    });
+
+    expect(exitCode).toBe(1);
+    expect(mavenRunner.run).not.toHaveBeenCalled();
+    expect(vitestRunner.run).not.toHaveBeenCalled();
+
+    expect(stderr).toHaveBeenCalledWith('Selection incomplete. Some changes have no validation target.');
+  });
+
+  it('does not execute any target when another target has unmapped changes', async () => {
+    const typescriptChange = {
+      status: 'modified' as const,
+      path: 'src/cli.ts',
+    };
+
+    const javaChange = {
+      status: 'modified' as const,
+      path: 'examples/java-orders/src/main/java/com/forge/orders/OrderService.java',
+    };
+
+    const getChanges = vi.fn(async () => [typescriptChange, javaChange]);
+
+    const incompleteJavaTarget: ValidationTarget = {
+      ...javaTarget,
+      planSelection: vi.fn(async () => ({
+        selectedTests: [javaTest],
+        unmappedChanges: [javaChange],
+      })),
+    };
+
+    const stderr = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const exitCode = await main(['run'], getChanges, {
+      targets: [vitestTarget, incompleteJavaTarget],
+    });
+
+    expect(vitestTarget.planSelection).toHaveBeenCalledOnce();
+    expect(incompleteJavaTarget.planSelection).toHaveBeenCalledOnce();
+
+    expect(vitestRunner.run).not.toHaveBeenCalled();
+    expect(mavenRunner.run).not.toHaveBeenCalled();
+
     expect(exitCode).toBe(1);
 
     expect(stderr).toHaveBeenCalledWith('Selection incomplete. Execution requires a fallback policy.');
