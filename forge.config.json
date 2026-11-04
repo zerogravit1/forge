@@ -1,0 +1,54 @@
+{
+  "version": "1.0.0",
+  "roots": {
+    "internal": {
+      "forge": {
+        "path": ".",
+        "sources": ["src"],
+        "tests": ["src"]
+      }
+    },
+    "examples": {
+      "java-orders": {
+        "path": "examples/java-orders",
+        "sources": ["src/main/java"],
+        "tests": ["src/test/java"]
+      }
+    },
+    "projects": {}
+    
+  },
+  "adapters": {
+    "typescript": {
+      "type": "typescript"
+    },
+    "java": {
+      "type": "java"
+    }
+  },
+  "runners": {
+    "vitest": {
+      "type": "vitest"
+    },
+    "maven": {
+      "type": "maven"
+    }
+  },
+  "targets": {
+    "internal": {
+      "forge-tests": {
+        "root": "internal.forge",
+        "adapter": ["typescript"],
+        "runner": ["vitest"]
+      }
+    },
+    "examples": {
+      "java-orders-tests": {
+        "root": "examples.java-orders",
+        "adapter": ["java"],
+        "runner": ["maven"]
+      }
+    },
+    "projects": {}
+  }
+}
