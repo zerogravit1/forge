@@ -580,6 +580,23 @@ describe('main', () => {
     expect(exitCode).toBe(0);
   });
 
+  it('plans Java test using the default CLI services', async () => {
+    const change = {
+      status: 'modified' as const,
+      path: 'examples/java-orders/src/main/java/com/forge/orders/OrderService.java',
+    };
+
+    const getChanges = vi.fn(async () => [change]);
+
+    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    const exitCode = await main(['plan'], getChanges);
+    
+    expect(stdout).toHaveBeenCalledWith('  ' + javaTest + '\n');
+
+    expect(exitCode).toBe(0);
+  });
+
   it('reports selections and unmapped changes across multiple targets', async () => {
     const changes = [
       {
