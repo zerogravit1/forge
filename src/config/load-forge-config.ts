@@ -7,11 +7,11 @@ export async function loadForgeConfig(repoRoot: string): Promise<ForgeConfig> {
   const configPath = resolve(repoRoot, 'forge.config.json');
   const contents = await readFile(configPath, 'utf8');
 
-  const parsed: unknown = JSON.parse(contents);
+  const parsed: ForgeConfig = JSON.parse(contents);
 
   return validateForgeConfig(parsed);
 }
 
-export function validateForgeConfig(parsedConfig: unknown) {
+export function validateForgeConfig(parsedConfig: ForgeConfig) {
   return parsedConfig;
 }
