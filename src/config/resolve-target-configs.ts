@@ -25,6 +25,12 @@ export function resolveTargetConfigs(config: ForgeConfig): ResolvedTargetConfig[
         }
       }
 
+      for (const runner of target.runner) {
+        if (!Object.hasOwn(config.runners, runner)) {
+          throw new Error(`Unknown runner: ${runner}`);
+        }
+      }
+
       resolved.push({
         id,
         projectRoot: root.path,

@@ -81,4 +81,36 @@ describe('resolveTargetConfigs', () => {
       'Unknown adapter: java',
     );
   });
+
+  it('rejects a target referencing an unknown runner', () => {
+    const config: ForgeConfig = {
+      version: '1.0.0',
+      roots: {
+        examples: {
+          'java-orders': {
+            path: 'examples/java-orders',
+            sources: ['src/main/java'],
+            tests: ['src/test/java'],
+          },
+        },
+      },
+      adapters: {
+        java: { type: 'java' },
+      },
+      runners: {},
+      targets: {
+        examples: {
+          'java-orders-tests': {
+            root: 'examples.java-orders',
+            adapter: ['java'],
+            runner: ['maven'],
+          },
+        },
+      },
+    };
+
+    expect(() => resolveTargetConfigs(config)).toThrow(
+      'Unknown runner: maven',
+    );
+  });
 });
