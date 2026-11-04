@@ -580,6 +580,43 @@ describe('main', () => {
     expect(exitCode).toBe(0);
   });
 
+  it('reports selections and unmapped changes across multiple targets', async () => {
+    const changes = [
+      {
+        status: 'modified' as const,
+        path: 'src/cli.ts',
+      },
+      {
+        status: 'modified' as const,
+        path: 'examples/java-orders/src/main/java/com/forge/orders/OrderService.java',
+      },
+      {
+        status: 'added' as const,
+        path: 'unmapped/unknown-file.txt',
+      },
+    ];
+
+    const getChanges = vi.fn(async () => changes);
+    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    const exitCode = await main(['plan'], getChanges, {
+      targets: [vitestTarget, javaTarget],
+    });
+
+    expect(vitestTarget.planSelection).toHaveBeenCalledOnce();
+    expect(javaTarget.planSelection).toHaveBeenCalledOnce();
+
+    expect(stdout).toHaveBeenCalledWith('  src/cli.test.ts\n');
+    expect(stdout).toHaveBeenCalledWith(`  ${javaTest}\n`);
+    expect(stdout).toHaveBeenCalledWith('  added\tunmapped/unknown-file.txt\n');
+    expect(stdout).toHaveBeenCalledWith('\nSelection incomplete: 1 change has no known test mapping.\n');
+
+    expect(vitestRunner.run).not.toHaveBeenCalled();
+    expect(mavenRunner.run).not.toHaveBeenCalled();
+
+    expect(exitCode).toBe(0);
+  });
+
   it('does not execute Java tests when another change has no validation target', async () => {
     const getChanges = vi.fn(async () => [
       {
