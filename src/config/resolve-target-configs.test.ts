@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { loadForgeConfig } from './load-forge-config.js';
 import { resolveTargetConfigs } from './resolve-target-configs.js';
+import type { ForgeConfig } from './forge-config.js';
 
 describe('resolveTargetConfigs', () => {
   it('resolves namespaced valdiation targets', async () => {
@@ -27,5 +28,27 @@ describe('resolveTargetConfigs', () => {
         runners: ['maven'],
       }),
     ]);
+  });
+
+  it('rejects a target referencing an unknown root', () => {
+    const config: ForgeConfig = {
+      version: '1.0.0',
+      roots: {},
+      adapters: {},
+      runners: {},
+      targets: {
+        examples: {
+          'unknown-tests': {
+            root: 'examples.unknown',
+            adapter: [],
+            runner: [],
+          },
+        },
+      },
+    };
+
+    expect(() => resolveTargetConfigs(config)).toThrow(
+      'Unknown root: examples.unknown',
+    );
   });
 });
