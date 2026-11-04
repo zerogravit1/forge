@@ -27,10 +27,7 @@ type CliServices = LegacyCliServices | TargetCliServices;
 
 const javaProject = 'examples/java-orders';
 
-const javaAnalyzer = createJavaAnalyzer([
-  `${javaProject}/src/main/java`,
-  `${javaProject}/src/test/java`,
-]);
+const javaAnalyzer = createJavaAnalyzer([`${javaProject}/src/main/java`, `${javaProject}/src/test/java`]);
 
 // const defaultServices: CliServices = {
 //   discoverTestFiles: discoverVitestTestFiles,
@@ -49,17 +46,9 @@ const defaultServices: CliServices = {
     },
     {
       id: 'java-orders',
-      includesChange: (change) =>
-        change.path.startsWith(`${javaProject}/`),
-      discoverTestFiles: (repoRoot) =>
-        discoverJavaTestFiles(repoRoot, javaProject),
-      planSelection: (changes, testFiles, repoRoot) =>
-        planTestSelection(
-          changes,
-          testFiles,
-          repoRoot,
-          javaAnalyzer,
-        ),
+      includesChange: (change) => change.path.startsWith(`${javaProject}/`),
+      discoverTestFiles: (repoRoot) => discoverJavaTestFiles(repoRoot, javaProject),
+      planSelection: (changes, testFiles, repoRoot) => planTestSelection(changes, testFiles, repoRoot, javaAnalyzer),
       runner: createMavenRunner(javaProject),
     },
   ],

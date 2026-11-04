@@ -591,7 +591,7 @@ describe('main', () => {
     const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
     const exitCode = await main(['plan'], getChanges);
-    
+
     expect(stdout).toHaveBeenCalledWith('  ' + javaTest + '\n');
 
     expect(exitCode).toBe(0);
