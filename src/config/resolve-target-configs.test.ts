@@ -11,7 +11,7 @@ describe('resolveTargetConfigs', () => {
 
     expect(targets).toEqual([
       expect.objectContaining({
-        id: 'internal.forget-tests',
+        id: 'internal.forge-tests',
         projectRoot: '.',
         sourceRoots: ['src'],
         testRoots: ['src'],
