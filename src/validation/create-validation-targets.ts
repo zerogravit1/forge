@@ -66,13 +66,10 @@ export function createValidationTargets(config: ForgeConfig, resolved: ResolvedT
     const adapterType = adapterDefinition.type;
 
     const supported =
-      (adapterType === 'java' && runnerType === 'maven') ||
-      (adapterType === 'typescript' && runnerType === 'vitest');
+      (adapterType === 'java' && runnerType === 'maven') || (adapterType === 'typescript' && runnerType === 'vitest');
 
     if (!supported) {
-      throw new Error(
-        `Unsupported adapter/runner combination: ${adapterType} + ${runnerType}`,
-      );
+      throw new Error(`Unsupported adapter/runner combination: ${adapterType} + ${runnerType}`);
     }
 
     switch (adapterType) {
@@ -100,20 +97,15 @@ export function createValidationTargets(config: ForgeConfig, resolved: ResolvedT
       }
 
       case 'typescript': {
-        const sourceRoots = [
-          ...targetConfig.sourceRoots,
-          ...targetConfig.testRoots,
-        ].map((path) => posix.join(targetConfig.projectRoot, path));
+        const sourceRoots = [...targetConfig.sourceRoots, ...targetConfig.testRoots].map((path) =>
+          posix.join(targetConfig.projectRoot, path),
+        );
 
         targets.push({
           id: targetConfig.id,
 
           includesChange: (change) =>
-            sourceRoots.some(
-              (root) =>
-                change.path === root ||
-                change.path.startsWith(`${root}/`),
-            ),
+            sourceRoots.some((root) => change.path === root || change.path.startsWith(`${root}/`)),
 
           discoverTestFiles: discoverVitestTestFiles,
 

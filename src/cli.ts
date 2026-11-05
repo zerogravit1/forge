@@ -35,24 +35,24 @@ type CliServices = LegacyCliServices | TargetCliServices;
 //   runner: createVitestRunner(),
 // };
 
-const defaultServices: CliServices = {
-  targets: [
-    {
-      id: 'vitest',
-      includesChange: (change) => change.path.startsWith('src/'),
-      discoverTestFiles: discoverVitestTestFiles,
-      planSelection: planTestSelection,
-      runner: createVitestRunner(),
-    },
-    {
-      id: 'java-orders',
-      includesChange: (change) => change.path.startsWith(`${javaProject}/`),
-      discoverTestFiles: (repoRoot) => discoverJavaTestFiles(repoRoot, javaProject),
-      planSelection: (changes, testFiles, repoRoot) => planTestSelection(changes, testFiles, repoRoot, javaAnalyzer),
-      runner: createMavenRunner(javaProject),
-    },
-  ],
-};
+// const defaultServices: CliServices = {
+//   targets: [
+//     {
+//       id: 'vitest',
+//       includesChange: (change) => change.path.startsWith('src/'),
+//       discoverTestFiles: discoverVitestTestFiles,
+//       planSelection: planTestSelection,
+//       runner: createVitestRunner(),
+//     },
+//     {
+//       id: 'java-orders',
+//       includesChange: (change) => change.path.startsWith(`${javaProject}/`),
+//       discoverTestFiles: (repoRoot) => discoverJavaTestFiles(repoRoot, javaProject),
+//       planSelection: (changes, testFiles, repoRoot) => planTestSelection(changes, testFiles, repoRoot, javaAnalyzer),
+//       runner: createMavenRunner(javaProject),
+//     },
+//   ],
+// };
 
 export async function main(
   args = process.argv.slice(2),
