@@ -65,6 +65,16 @@ export function createValidationTargets(config: ForgeConfig, resolved: ResolvedT
 
     const adapterType = adapterDefinition.type;
 
+    const supported =
+      (adapterType === 'java' && runnerType === 'maven') ||
+      (adapterType === 'typescript' && runnerType === 'vitest');
+
+    if (!supported) {
+      throw new Error(
+        `Unsupported adapter/runner combination: ${adapterType} + ${runnerType}`,
+      );
+    }
+
     switch (adapterType) {
       case 'java': {
         const javaRoots = [...targetConfig.sourceRoots, ...targetConfig.testRoots].map((path) =>

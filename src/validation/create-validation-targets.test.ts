@@ -51,4 +51,16 @@ describe('createValidationTargets', () => {
       }),
     ).toBe(false);
   });
+
+  it('rejects unsupported adapter and runner combinations', async () => {
+    const config = await loadForgeConfig(process.cwd());
+
+    config.runners.maven = { type: 'vitest' };
+
+    const resolved = resolveTargetConfigs(config);
+
+    expect(() => createValidationTargets(config, resolved)).toThrow(
+      'Unsupported adapter/runner combination: java + vitest',
+    );
+  });
 });
