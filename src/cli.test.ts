@@ -702,9 +702,7 @@ describe('main', () => {
   it('returns an error when Forge configuraiton cannot be loaded', async () => {
     const getChanges = vi.fn(async () => []);
 
-    vi.spyOn(configLoader, 'loadForgeConfig').mockRejectedValueOnce(
-      new Error('Invalid Forge configuration'),
-    );
+    vi.spyOn(configLoader, 'loadForgeConfig').mockRejectedValueOnce(new Error('Invalid Forge configuration'));
 
     const stderr = vi.spyOn(console, 'error').mockImplementation(() => {});
 
