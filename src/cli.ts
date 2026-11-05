@@ -6,12 +6,15 @@ import { createVitestRunner } from './execution/vitest-runner.js';
 
 import type { TestRunner } from './execution/test-runner.js';
 import type { ValidationTarget } from './validation/validation-target.js';
-import { planValidationTargets } from './validation/plan-validation-targets.js';
 import type { SelectionResult } from './selection/select-tests.js';
 
+import { planValidationTargets } from './validation/plan-validation-targets.js';
 import { discoverJavaTestFiles } from './discovery/java-test-files.js';
 import { createJavaAnalyzer } from './analyzers/java/java-analyzer.js';
 import { createMavenRunner } from './execution/maven-runner.js';
+import { loadForgeConfig } from './config/load-forge-config.js';
+import { resolveTargetConfigs } from './config/resolve-target-configs.js';
+import { createValidationTargets } from './validation/create-validation-targets.js';
 
 interface LegacyCliServices {
   discoverTestFiles: typeof discoverVitestTestFiles;
@@ -57,10 +60,21 @@ const defaultServices: CliServices = {
 export async function main(
   args = process.argv.slice(2),
   getChanges = getGitChanges,
-  services: CliServices = defaultServices,
+  services?: CliServices,
 ): Promise<number> {
   try {
     const options = readCliOptions(args);
+
+    if (!services) {
+      const repoRoot = process.cwd();
+
+      const config = await loadForgeConfig(repoRoot);
+      const resolved = resolveTargetConfigs(config);
+
+      services = {
+        targets: createValidationTargets(config, resolved),
+      };
+    }
 
     switch (options.command) {
       case 'plan': {
