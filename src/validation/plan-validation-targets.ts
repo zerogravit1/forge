@@ -16,7 +16,12 @@ export async function planValidationTargets(
     (change) => change.path === 'forge.config.json' || change.previousPath === 'forge.config.json',
   );
 
-  const unmatchedChanges = changes.filter((change) => !targets.some((target) => target.includesChange(change)));
+  const unmatchedChanges = changes.filter(
+    (change) =>
+      change.path !== 'forge.config.json' &&
+      change.previousPath !== 'forge.config.json' &&
+      !targets.some((target) => target.includesChange(change)),
+  );
 
   const plans: TargetPlan[] = [];
 
