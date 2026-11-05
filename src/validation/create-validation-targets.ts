@@ -8,11 +8,9 @@ import { posix } from 'node:path';
 import { createJavaAnalyzer } from '../analyzers/java/java-analyzer.js';
 import { discoverJavaTestFiles } from '../discovery/java-test-files.js';
 import { planTestSelection } from '../selection/plan-test-selection.js';
+import { discoverVitestTestFiles } from '../discovery/vitest-test-files.js';
 
-export function createValidationTargets(
-  config: ForgeConfig,
-  resolved: ResolvedTargetConfig[],
-): ValidationTarget[] {
+export function createValidationTargets(config: ForgeConfig, resolved: ResolvedTargetConfig[]): ValidationTarget[] {
   const targets: ValidationTarget[] = [];
 
   for (const targetConfig of resolved) {
@@ -46,7 +44,7 @@ export function createValidationTargets(
         break;
 
       default:
-        throw new Error(`Unsupport runner type: ${runnerType}`);
+        throw new Error(`Unsupported runner type: ${runnerType}`);
     }
 
     if (targetConfig.adapters.length !== 1) {
@@ -56,7 +54,7 @@ export function createValidationTargets(
     const [adapterName] = targetConfig.adapters;
 
     if (!adapterName) {
-      throw new Error (`Missing adapter: ${targetConfig.id}`);
+      throw new Error(`Missing adapter: ${targetConfig.id}`);
     }
 
     const adapterDefinition = config.adapters[adapterName];
@@ -67,25 +65,20 @@ export function createValidationTargets(
 
     const adapterType = adapterDefinition.type;
 
-    let adapter;
-
     switch (adapterType) {
-      case 'java':
-        const javaRoots = [
-          ...targetConfig.sourceRoots,
-          ...targetConfig.testRoots,
-        ].map((path) => posix.join(targetConfig.projectRoot, path));
+      case 'java': {
+        const javaRoots = [...targetConfig.sourceRoots, ...targetConfig.testRoots].map((path) =>
+          posix.join(targetConfig.projectRoot, path),
+        );
 
         const javaAnalyzer = createJavaAnalyzer(javaRoots);
 
         targets.push({
           id: targetConfig.id,
 
-          includesChange: (change) =>
-            change.path.startsWith(`${targetConfig.projectRoot}/`),
+          includesChange: (change) => change.path.startsWith(`${targetConfig.projectRoot}/`),
 
-          discoverTestFiles: (repoRoot) =>
-            discoverJavaTestFiles(repoRoot, targetConfig.projectRoot),
+          discoverTestFiles: (repoRoot) => discoverJavaTestFiles(repoRoot, targetConfig.projectRoot),
 
           planSelection: (changes, testFiles, repoRoot) =>
             planTestSelection(changes, testFiles, repoRoot, javaAnalyzer),
@@ -94,9 +87,33 @@ export function createValidationTargets(
         });
 
         break;
+      }
 
-      case 'typescript':
+      case 'typescript': {
+        const sourceRoots = [
+          ...targetConfig.sourceRoots,
+          ...targetConfig.testRoots,
+        ].map((path) => posix.join(targetConfig.projectRoot, path));
+
+        targets.push({
+          id: targetConfig.id,
+
+          includesChange: (change) =>
+            sourceRoots.some(
+              (root) =>
+                change.path === root ||
+                change.path.startsWith(`${root}/`),
+            ),
+
+          discoverTestFiles: discoverVitestTestFiles,
+
+          planSelection: planTestSelection,
+
+          runner,
+        });
+
         break;
+      }
 
       default:
         throw new Error(`Unsupported adapter type: ${adapterType}`);
