@@ -1,12 +1,15 @@
 import type { ForgeConfig, ResolvedTargetConfig } from '../config/forge-config.js';
-import { loadForgeConfig } from '../config/load-forge-config.js';
-import { resolveTargetConfigs } from '../config/resolve-target-configs.js';
-import { createMavenRunner } from '../execution/maven-runner.js';
 import type { TestRunner } from '../execution/test-runner.js';
-import { createVitestRunner } from '../execution/vitest-runner.js';
 import type { ValidationTarget } from './validation-target.js';
 
-export async function createValidationTargets(
+import { createVitestRunner } from '../execution/vitest-runner.js';
+import { createMavenRunner } from '../execution/maven-runner.js';
+import { posix } from 'node:path';
+import { createJavaAnalyzer } from '../analyzers/java/java-analyzer.js';
+import { discoverJavaTestFiles } from '../discovery/java-test-files.js';
+import { planTestSelection } from '../selection/plan-test-selection.js';
+
+export function createValidationTargets(
   config: ForgeConfig,
   resolved: ResolvedTargetConfig[],
 ): ValidationTarget[] {
@@ -68,6 +71,28 @@ export async function createValidationTargets(
 
     switch (adapterType) {
       case 'java':
+        const javaRoots = [
+          ...targetConfig.sourceRoots,
+          ...targetConfig.testRoots,
+        ].map((path) => posix.join(targetConfig.projectRoot, path));
+
+        const javaAnalyzer = createJavaAnalyzer(javaRoots);
+
+        targets.push({
+          id: targetConfig.id,
+
+          includesChange: (change) =>
+            change.path.startsWith(`${targetConfig.projectRoot}/`),
+
+          discoverTestFiles: (repoRoot) =>
+            discoverJavaTestFiles(repoRoot, targetConfig.projectRoot),
+
+          planSelection: (changes, testFiles, repoRoot) =>
+            planTestSelection(changes, testFiles, repoRoot, javaAnalyzer),
+
+          runner,
+        });
+
         break;
 
       case 'typescript':
