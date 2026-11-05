@@ -9,9 +9,6 @@ import type { ValidationTarget } from './validation/validation-target.js';
 import type { SelectionResult } from './selection/select-tests.js';
 
 import { planValidationTargets } from './validation/plan-validation-targets.js';
-import { discoverJavaTestFiles } from './discovery/java-test-files.js';
-import { createJavaAnalyzer } from './analyzers/java/java-analyzer.js';
-import { createMavenRunner } from './execution/maven-runner.js';
 import { loadForgeConfig } from './config/load-forge-config.js';
 import { resolveTargetConfigs } from './config/resolve-target-configs.js';
 import { createValidationTargets } from './validation/create-validation-targets.js';
@@ -28,9 +25,9 @@ interface TargetCliServices {
 
 type CliServices = LegacyCliServices | TargetCliServices;
 
-const javaProject = 'examples/java-orders';
+// const javaProject = 'examples/java-orders';
 
-const javaAnalyzer = createJavaAnalyzer([`${javaProject}/src/main/java`, `${javaProject}/src/test/java`]);
+// const javaAnalyzer = createJavaAnalyzer([`${javaProject}/src/main/java`, `${javaProject}/src/test/java`]);
 
 // const defaultServices: CliServices = {
 //   discoverTestFiles: discoverVitestTestFiles,
