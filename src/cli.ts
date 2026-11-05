@@ -6,12 +6,12 @@ import { createVitestRunner } from './execution/vitest-runner.js';
 
 import type { TestRunner } from './execution/test-runner.js';
 import type { ValidationTarget } from './validation/validation-target.js';
-import { planValidationTargets } from './validation/plan-validation-targets.js';
 import type { SelectionResult } from './selection/select-tests.js';
 
-import { discoverJavaTestFiles } from './discovery/java-test-files.js';
-import { createJavaAnalyzer } from './analyzers/java/java-analyzer.js';
-import { createMavenRunner } from './execution/maven-runner.js';
+import { planValidationTargets } from './validation/plan-validation-targets.js';
+import { loadForgeConfig } from './config/load-forge-config.js';
+import { resolveTargetConfigs } from './config/resolve-target-configs.js';
+import { createValidationTargets } from './validation/create-validation-targets.js';
 
 interface LegacyCliServices {
   discoverTestFiles: typeof discoverVitestTestFiles;
@@ -25,42 +25,24 @@ interface TargetCliServices {
 
 type CliServices = LegacyCliServices | TargetCliServices;
 
-const javaProject = 'examples/java-orders';
-
-const javaAnalyzer = createJavaAnalyzer([`${javaProject}/src/main/java`, `${javaProject}/src/test/java`]);
-
-// const defaultServices: CliServices = {
-//   discoverTestFiles: discoverVitestTestFiles,
-//   planSelection: planTestSelection,
-//   runner: createVitestRunner(),
-// };
-
-const defaultServices: CliServices = {
-  targets: [
-    {
-      id: 'vitest',
-      includesChange: (change) => change.path.startsWith('src/'),
-      discoverTestFiles: discoverVitestTestFiles,
-      planSelection: planTestSelection,
-      runner: createVitestRunner(),
-    },
-    {
-      id: 'java-orders',
-      includesChange: (change) => change.path.startsWith(`${javaProject}/`),
-      discoverTestFiles: (repoRoot) => discoverJavaTestFiles(repoRoot, javaProject),
-      planSelection: (changes, testFiles, repoRoot) => planTestSelection(changes, testFiles, repoRoot, javaAnalyzer),
-      runner: createMavenRunner(javaProject),
-    },
-  ],
-};
-
 export async function main(
   args = process.argv.slice(2),
   getChanges = getGitChanges,
-  services: CliServices = defaultServices,
+  services?: CliServices,
 ): Promise<number> {
   try {
     const options = readCliOptions(args);
+
+    if (!services) {
+      const repoRoot = process.cwd();
+
+      const config = await loadForgeConfig(repoRoot);
+      const resolved = resolveTargetConfigs(config);
+
+      services = {
+        targets: createValidationTargets(config, resolved),
+      };
+    }
 
     switch (options.command) {
       case 'plan': {

@@ -12,20 +12,34 @@ export async function planValidationTargets(
   targets: readonly ValidationTarget[],
   repoRoot: string,
 ) {
-  const unmatchedChanges = changes.filter((change) => !targets.some((target) => target.includesChange(change)));
+  const configChanged = changes.some(
+    (change) => change.path === 'forge.config.json' || change.previousPath === 'forge.config.json',
+  );
+
+  const unmatchedChanges = changes.filter(
+    (change) =>
+      change.path !== 'forge.config.json' &&
+      change.previousPath !== 'forge.config.json' &&
+      !targets.some((target) => target.includesChange(change)),
+  );
 
   const plans: TargetPlan[] = [];
 
   for (const target of targets) {
     const targetChanges = changes.filter((change) => target.includesChange(change));
 
-    if (targetChanges.length === 0) {
+    if (!configChanged && targetChanges.length === 0) {
       continue;
     }
 
     const testFiles = await target.discoverTestFiles(repoRoot);
 
-    const selection = await target.planSelection(targetChanges, testFiles, repoRoot);
+    const selection: SelectionResult = configChanged
+      ? {
+          selectedTests: testFiles,
+          unmappedChanges: [],
+        }
+      : await target.planSelection(targetChanges, testFiles, repoRoot);
 
     plans.push({ target, selection });
   }

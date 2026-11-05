@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { main } from './cli.js';
 import type { ValidationTarget } from './validation/validation-target.js';
 
+import * as configLoader from './config/load-forge-config.js';
+
 afterEach(() => {
   vi.restoreAllMocks();
   vi.clearAllMocks();
@@ -695,5 +697,19 @@ describe('main', () => {
     expect(exitCode).toBe(1);
 
     expect(stderr).toHaveBeenCalledWith('Selection incomplete. Execution requires a fallback policy.');
+  });
+
+  it('returns an error when Forge configuraiton cannot be loaded', async () => {
+    const getChanges = vi.fn(async () => []);
+
+    vi.spyOn(configLoader, 'loadForgeConfig').mockRejectedValueOnce(new Error('Invalid Forge configuration'));
+
+    const stderr = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const exitCode = await main(['plan'], getChanges);
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toHaveBeenCalledWith('Invalid Forge configuration');
+    expect(getChanges).not.toHaveBeenCalled();
   });
 });
