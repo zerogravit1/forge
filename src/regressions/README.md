@@ -13,13 +13,13 @@ Use the Node version in `.nvmrc` and install the locked dependencies with `npm c
 From the repository root:
 
 ```bash
-# Opt in to all seven regression tests. Expected baseline result: seven failures.
+# Opt in to all six regression tests. Expected baseline result: six failures.
 FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions
 
 # Select a single issue, for example #13.
 FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions -t '#13'
 
-# Normal passing CI workflow; the seven new tests are skipped.
+# Normal passing CI workflow; the six new tests are skipped.
 npm run check
 ```
 
@@ -78,7 +78,7 @@ The branch starts directly at `6aaef70`. Before adding the test-only commit, its
 production tree is exactly that reviewed commit. Verification consists of:
 
 1. Running the opt-in suite against that unchanged production tree and checking
-   that exactly seven tests execute and fail at the assertions described above.
+   that exactly six tests execute and fail at the assertions described above.
 2. Running each issue filter individually to confirm it executes exactly its
    corresponding regression test.
 3. Running `npm run check` with opt-in disabled: type checking, lint, existing
@@ -88,7 +88,7 @@ production tree is exactly that reviewed commit. Verification consists of:
 
 Observed results at the reviewed implementation:
 
-- Opt-in suite: **7 executed, 7 failed**, all at the defect assertions above.
+- Opt-in suite: **6 executed, 6 failed**, all at the defect assertions above.
 - Each issue filter: **1 failed**, with the other six regressions skipped; no
   setup, import, or timeout errors substituted for the expected failure.
 - Normal `npm run check`: **95 passed, 8 skipped**. Seven skips are this
