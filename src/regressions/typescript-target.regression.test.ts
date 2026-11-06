@@ -148,6 +148,11 @@ describe('TypeScript target isolation regression', () => {
           numTotalTests: 1,
           numPassedTests: 0,
           numFailedTests: 1,
+          testResults: [
+            expect.objectContaining({
+              name: expect.stringMatching(/[/\\]tests[/\\]App\.test\.ts$/),
+            }),
+          ],
         });
       }
 
