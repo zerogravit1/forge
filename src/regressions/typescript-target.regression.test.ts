@@ -5,6 +5,9 @@ import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
+import { spawnSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
+
 import type { ForgeConfig } from '../config/forge-config.js';
 import { resolveTargetConfigs } from '../config/resolve-target-configs.js';
 import { createValidationTargets } from '../validation/create-validation-targets.js';
@@ -58,6 +61,7 @@ describe.skipIf(process.env.FORGE_REGRESSION_BASELINE !== '1')('TypeScript targe
         runners: { vitest: { type: 'vitest' } },
         targets: { apps: { tests: { root: 'apps.app', adapter: ['ts'], runner: ['vitest'] } } },
       };
+      await write('forge.config.json', JSON.stringify(config));
       const [target] = createValidationTargets(config, resolveTargetConfigs(config));
       const discovered = await target.discoverTestFiles(repoRoot);
 
@@ -77,6 +81,57 @@ describe.skipIf(process.env.FORGE_REGRESSION_BASELINE !== '1')('TypeScript targe
         const report: unknown = JSON.parse(await readFile(join(appRoot, 'app-results.json'), 'utf8'));
         expect(report).toMatchObject({ numTotalTests: 1, numPassedTests: 1, numFailedTests: 0 });
       }
+
+      // added code for regression validation
+
+      // Now make the configured package test fail.
+      await write(
+        appTest,
+        `import { test, expect } from 'vitest';
+         test('app test', () => expect(true).toBe(false));`,
+      );
+
+      // Remove previous reports so we can verify fresh execution
+      await rm(join(appRoot, 'app-results.json'), { force: true });
+      await rm(join(repoRoot, 'root-results.json'), { force: true });
+
+      // Exercise Forge's actual CLI orchestration with a controlled change.
+      const cliUrl = pathToFileURL(resolve('src/cli.ts')).href;
+
+      const script = `
+        import { main } from ${JSON.stringify(cliUrl)};
+        const exitCode = await main(
+          ['run'],
+          async () => [{ status: 'modified', path: 'forge.config.json }]
+        );
+        process.exitCode = exitCode;
+      `;
+
+      const forgeRun = spawnSync(process.execPath, ['--import', 'tsx', '--input-type=module', '--eval', script], {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        timeout: 20_000,
+      });
+
+      expect(forgeRun.error).toBeUndefined();
+      expect.soft(forgeRun.status, `Forge output:\n${forgeRun.stdout}\n${forgeRun.stderr}`).toBe(1);
+
+      // Confirm that the actual failing package test executed.
+      const filesAfterFailure = await readdir(appRoot);
+
+      expect.soft(filesAfterFailure).toContain('app-results.json');
+
+      if (filesAfterFailure.includes('app-results.json')) {
+        const report: unknown = JSON.parse(await readFile(join(appRoot, 'app-results.json'), 'utf8'));
+
+        expect(report).toMatchObject({
+          numTotalTests: 1,
+          numPassedTests: 0,
+          numFailedTests: 1,
+        });
+      }
+
+      expect(await readdir(repoRoot)).not.toContain('root-results.json');
     } finally {
       await rm(repoRoot, { recursive: true, force: true });
     }
