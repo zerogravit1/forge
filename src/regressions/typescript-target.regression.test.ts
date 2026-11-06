@@ -14,11 +14,12 @@ import { createValidationTargets } from '../validation/create-validation-targets
 
 const execFileAsync = promisify(execFile);
 
-describe.skipIf(process.env.FORGE_REGRESSION_BASELINE !== '1')('TypeScript target isolation regression', () => {
+describe('TypeScript target isolation regression', () => {
   it('#17 discovers and executes the configured package without substituting root or sibling tests', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'forge-typescript-target-regression-'));
     const appRoot = join(repoRoot, 'packages/app');
     const appTest = 'packages/app/tests/App.test.ts';
+    const unexpectedTest = 'packages/app/src/Unexpected.test.ts';
 
     async function write(path: string, source: string): Promise<void> {
       const file = join(repoRoot, path);
@@ -48,6 +49,8 @@ describe.skipIf(process.env.FORGE_REGRESSION_BASELINE !== '1')('TypeScript targe
         `import { test, expect } from 'vitest'; test('sibling test', () => expect(true).toBe(true));`,
       );
 
+      await write(unexpectedTest, `import { test, expect } from 'vitest'; test('app test', () => expect(true).toBe(true));`);
+      
       // Prove the package configuration and its test work before exercising Forge.
       await execFileAsync(process.execPath, [resolve('node_modules/vitest/vitest.mjs'), 'run'], { cwd: appRoot });
       const controlReport: unknown = JSON.parse(await readFile(join(appRoot, 'app-results.json'), 'utf8'));
@@ -100,10 +103,12 @@ describe.skipIf(process.env.FORGE_REGRESSION_BASELINE !== '1')('TypeScript targe
 
       const script = `
         import { main } from ${JSON.stringify(cliUrl)};
+
         const exitCode = await main(
           ['run'],
-          async () => [{ status: 'modified', path: 'forge.config.json }]
+          async () => [{ status: 'modified', path: 'forge.config.json' }]
         );
+        
         process.exitCode = exitCode;
       `;
 
