@@ -101,3 +101,19 @@ Observed results at the reviewed implementation:
 Promote these tests into normal CI only after the remediation sequence has been
 reviewed and the corresponding fixes are implemented. Do not change the
 expectations to match the current omissions or substitute unrelated tests.
+
+## Remediation status
+
+| Issue   | Status                                                                   |
+| ------- | ------------------------------------------------------------------------ |
+| #11–#16 | Open; regression tests quarantined                                       |
+| #17     | Fixed on `fix/typescript-target-isolation`; regression runs in normal CI |
+
+### Issue #17
+
+- Vitest discovery respects the configured project root and test roots.
+- Test execution uses the configured project's working directory.
+- Selected test paths are translated from repository-relative
+  to project-relative paths.
+- Tests outside the configured project are rejected.
+- Failing package tests propagate a nonzero Forge exit status.
