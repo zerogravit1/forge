@@ -88,10 +88,10 @@ production tree is exactly that reviewed commit. Verification consists of:
 
 Observed results at the reviewed implementation:
 
-- Opt-in suite: **6 executed, 6 failed**, all at the defect assertions above.
+- Opt-in suite: **7 executed, 6 failed, 1 passed**, all at the defect assertions above.
 - Each issue filter: **1 failed**, with the other six regressions skipped; no
   setup, import, or timeout errors substituted for the expected failure.
-- Normal `npm run check`: **95 passed, 8 skipped**. Seven skips are this
+- Normal `npm run check`: **100 passed, 7 skipped**. Seven skips are this
   quarantined baseline; the eighth is the existing optional Maven integration
   test. Type checking, lint, formatting, and the build pass.
 - The production implementation, dependency manifests, lockfile, and existing
