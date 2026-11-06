@@ -88,7 +88,16 @@ describe('TypeScript target isolation regression', () => {
 
       if (appFiles.includes('app-results.json')) {
         const report: unknown = JSON.parse(await readFile(join(appRoot, 'app-results.json'), 'utf8'));
-        expect(report).toMatchObject({ numTotalTests: 1, numPassedTests: 1, numFailedTests: 0 });
+        expect(report).toMatchObject({
+          numTotalTests: 1,
+          numPassedTests: 1,
+          numFailedTests: 0,
+          testResults: [
+            expect.objectContaining({
+              name: expect.stringMatching(/[/\\]tests[/\\]App\.test\.ts$/),
+            }),
+          ],
+        });
       }
 
       // added code for regression validation

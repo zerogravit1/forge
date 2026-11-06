@@ -65,7 +65,7 @@ describe('createVitestRunner', () => {
     'packages/app/../sibling/tests/Other.test.ts',
   ])('rejects test files outside the configured project: %s', async (testFile) => {
     const execute = vi.fn(async () => 0);
-    const runner = createVitestRunner('packaages/app', execute);
+    const runner = createVitestRunner('packages/app', execute);
 
     await expect(runner.run([testFile], process.cwd())).rejects.toThrow('Test file outside configured project');
 
