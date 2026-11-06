@@ -36,7 +36,7 @@ describe('TypeScript target isolation regression', () => {
       );
       await write(
         'packages/app/vitest.config.mjs',
-        `export default { test: { include: ['tests/**/*.test.ts'], maxWorkers: 1,
+        `export default { test: { include: ['tests/**/*.test.ts', 'src/**/*.test.ts'], maxWorkers: 1,
           reporters: ['json'], outputFile: 'app-results.json' } };`,
       );
       await write(
@@ -49,10 +49,15 @@ describe('TypeScript target isolation regression', () => {
         `import { test, expect } from 'vitest'; test('sibling test', () => expect(true).toBe(true));`,
       );
 
-      await write(unexpectedTest, `import { test, expect } from 'vitest'; test('app test', () => expect(true).toBe(true));`);
-      
+      await write(
+        unexpectedTest,
+        `import { test, expect } from 'vitest'; test('unconfigured test must not run', () => expect(true).toBe(false));`,
+      );
+
       // Prove the package configuration and its test work before exercising Forge.
-      await execFileAsync(process.execPath, [resolve('node_modules/vitest/vitest.mjs'), 'run'], { cwd: appRoot });
+      await execFileAsync(process.execPath, [resolve('node_modules/vitest/vitest.mjs'), 'run', 'tests/App.test.ts'], {
+        cwd: appRoot,
+      });
       const controlReport: unknown = JSON.parse(await readFile(join(appRoot, 'app-results.json'), 'utf8'));
       expect(controlReport).toMatchObject({ numTotalTests: 1, numPassedTests: 1, numFailedTests: 0 });
       await rm(join(appRoot, 'app-results.json'));
@@ -69,6 +74,7 @@ describe('TypeScript target isolation regression', () => {
       const discovered = await target.discoverTestFiles(repoRoot);
 
       expect.soft(discovered).toEqual([appTest]);
+      expect.soft(discovered).not.toContain(unexpectedTest);
       expect.soft(discovered).not.toContain('root-tests/Unrelated.test.ts');
       expect.soft(discovered).not.toContain('packages/sibling/tests/Other.test.ts');
 

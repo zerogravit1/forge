@@ -1,7 +1,17 @@
 import { spawn } from 'node:child_process';
-import { relative, resolve, sep } from 'node:path';
+import { isAbsolute, relative, resolve, sep } from 'node:path';
 
-export function discoverVitestTestFiles(repoRoot: string, projectRoot = '.'): Promise<string[]> {
+function isWithinDirectory(directory: string, file: string): boolean {
+  const path = relative(directory, file);
+
+  return path === '' || (path !== '..' && !path.startsWith(`..${sep}`) && !isAbsolute(path));
+}
+
+export function discoverVitestTestFiles(
+  repoRoot: string,
+  projectRoot = '.',
+  testRoots: readonly string[] = ['.'],
+): Promise<string[]> {
   const projectDirectory = resolve(repoRoot, projectRoot);
 
   return new Promise<string[]>((resolveDiscovery, reject) => {
@@ -11,12 +21,11 @@ export function discoverVitestTestFiles(repoRoot: string, projectRoot = '.'): Pr
     });
 
     let output = '';
+    let errorOutput = '';
 
     child.stdout.on('data', (chunk: Buffer) => {
       output += chunk.toString();
     });
-
-    let errorOutput = '';
 
     child.stderr.on('data', (chunk: Buffer) => {
       errorOutput += chunk.toString();
@@ -32,11 +41,19 @@ export function discoverVitestTestFiles(repoRoot: string, projectRoot = '.'): Pr
         return;
       }
 
+      const allowDirectories = testRoots.map((root) => resolve(projectDirectory, root));
+
       const testFiles = output
         .split(/\r?\n/)
         .map((file) => file.trim())
         .filter(Boolean)
-        .map((file) => relative(repoRoot, resolve(projectDirectory, file)).split(sep).join('/'));
+        .map((file) => resolve(projectDirectory, file))
+        .filter(
+          (file) =>
+            isWithinDirectory(projectDirectory, file) &&
+            allowDirectories.some((directory) => isWithinDirectory(directory, file)),
+        )
+        .map((file) => relative(repoRoot, file).split(sep).join('/'));
 
       resolveDiscovery(testFiles);
     });

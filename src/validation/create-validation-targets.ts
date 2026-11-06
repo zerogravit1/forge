@@ -107,7 +107,8 @@ export function createValidationTargets(config: ForgeConfig, resolved: ResolvedT
           includesChange: (change) =>
             sourceRoots.some((root) => change.path === root || change.path.startsWith(`${root}/`)),
 
-          discoverTestFiles: (repoRoot) => discoverVitestTestFiles(repoRoot, targetConfig.projectRoot),
+          discoverTestFiles: (repoRoot) =>
+            discoverVitestTestFiles(repoRoot, targetConfig.projectRoot, targetConfig.testRoots),
 
           planSelection: planTestSelection,
 
