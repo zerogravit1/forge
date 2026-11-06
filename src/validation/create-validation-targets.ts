@@ -40,7 +40,7 @@ export function createValidationTargets(config: ForgeConfig, resolved: ResolvedT
         break;
 
       case 'vitest':
-        runner = createVitestRunner();
+        runner = createVitestRunner(targetConfig.projectRoot);
         break;
 
       default:
@@ -107,7 +107,7 @@ export function createValidationTargets(config: ForgeConfig, resolved: ResolvedT
           includesChange: (change) =>
             sourceRoots.some((root) => change.path === root || change.path.startsWith(`${root}/`)),
 
-          discoverTestFiles: discoverVitestTestFiles,
+          discoverTestFiles: (repoRoot) => discoverVitestTestFiles(repoRoot, targetConfig.projectRoot),
 
           planSelection: planTestSelection,
 

@@ -1,9 +1,12 @@
 import { spawn } from 'node:child_process';
+import { relative, resolve, sep } from 'node:path';
 
-export function discoverVitestTestFiles(repoRoot: string): Promise<string[]> {
-  return new Promise<string[]>((resolve, reject) => {
+export function discoverVitestTestFiles(repoRoot: string, projectRoot = '.'): Promise<string[]> {
+  const projectDirectory = resolve(repoRoot, projectRoot);
+
+  return new Promise<string[]>((resolveDiscovery, reject) => {
     const child = spawn('npx', ['--no-install', 'vitest', 'list', '--filesOnly'], {
-      cwd: repoRoot,
+      cwd: projectDirectory,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
@@ -32,9 +35,10 @@ export function discoverVitestTestFiles(repoRoot: string): Promise<string[]> {
       const testFiles = output
         .split(/\r?\n/)
         .map((file) => file.trim())
-        .filter(Boolean);
+        .filter(Boolean)
+        .map((file) => relative(repoRoot, resolve(projectDirectory, file)).split(sep).join('/'));
 
-      resolve(testFiles);
+      resolveDiscovery(testFiles);
     });
   });
 }
