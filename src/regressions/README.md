@@ -13,13 +13,13 @@ Use the Node version in `.nvmrc` and install the locked dependencies with `npm c
 From the repository root:
 
 ```bash
-# Opt in to all seven regression tests. Expected baseline result: seven failures.
+# Opt in to the six remaining quarantined regressions; #17 also runs. Expected baseline result: six failures.
 FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions
 
 # Select a single issue, for example #13.
 FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions -t '#13'
 
-# Normal passing CI workflow; the seven new tests are skipped.
+# Normal passing CI workflow; the six new tests are skipped.
 npm run check
 ```
 
@@ -64,7 +64,6 @@ FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions -t '#13'
 FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions -t '#14'
 FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions -t '#15'
 FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions -t '#16'
-FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions -t '#17'
 ```
 
 All seven findings reproduce. None remain unverified. Assertions on discovery,
@@ -101,3 +100,19 @@ Observed results at the reviewed implementation:
 Promote these tests into normal CI only after the remediation sequence has been
 reviewed and the corresponding fixes are implemented. Do not change the
 expectations to match the current omissions or substitute unrelated tests.
+
+## Remediation status
+
+| Issue   | Status                                                                   |
+| ------- | ------------------------------------------------------------------------ |
+| #11–#16 | Open; regression tests quarantined                                       |
+| #17     | Fixed on `fix/typescript-target-isolation`; regression runs in normal CI |
+
+### Issue #17
+
+- Vitest discovery respects the configured project root and test roots.
+- Test execution uses the configured project's working directory.
+- Selected test paths are translated from repository-relative
+  to project-relative paths.
+- Tests outside the configured project are rejected.
+- Failing package tests propagate a nonzero Forge exit status.
