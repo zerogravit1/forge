@@ -161,4 +161,126 @@ describe('TypeScript target isolation regression', () => {
       await rm(repoRoot, { recursive: true, force: true });
     }
   }, 30_000);
+
+  it('#17 named Vitest projects must execute failing package tests', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'forge-named-vitest-regression-'));
+    const appRoot = join(repoRoot, 'packages/app');
+    const appTest = 'packages/app/tests/App.test.ts';
+
+    async function write(path: string, source: string): Promise<void> {
+      const file = join(repoRoot, path);
+      await mkdir(join(file, '..'), { recursive: true });
+      await writeFile(file, source);
+    }
+
+    try {
+      await symlink(resolve('node_modules'), join(repoRoot, 'node_modules'), 'dir');
+
+      // a named Vitest project with deliberately failing test.
+      await write(
+        'packages/app/vitest.config.mjs',
+        `export default {
+          test: {
+            name: 'app',
+            include: ['tests/**/*.test.ts'],
+            maxWorkers: 1,
+            reporters: ['json'],
+            outputFile: 'app-results.json'
+          }
+        };`,
+      );
+
+      await write(
+        appTest,
+        `import { test, expect } from 'vitest';
+         test('named app failure', () => expect(true).toBe(false));`,
+      );
+
+      const config: ForgeConfig = {
+        version: '1.0.0',
+        roots: {
+          apps: {
+            app: {
+              path: 'packages/app',
+              sources: ['src'],
+              tests: ['tests'],
+            },
+          },
+        },
+        adapters: { ts: { type: 'typescript' } },
+        runners: { vitest: { type: 'vitest' } },
+        targets: {
+          apps: {
+            tests: {
+              root: 'apps.app',
+              adapter: ['ts'],
+              runner: ['vitest'],
+            },
+          },
+        },
+      };
+
+      await write('forge.config.json', JSON.stringify(config));
+
+      const [target] = createValidationTargets(config, resolveTargetConfigs(config));
+
+      // Discovery must return the actual repository-relative path.
+      const discovered = await target.discoverTestFiles(repoRoot);
+
+      expect.soft(discovered).toEqual([appTest]);
+
+      // Exercise the real Forge CLI, not just the runner.
+      const cliUrl = pathToFileURL(resolve('src/cli.ts')).href;
+
+      const script = `
+        import { main } from ${JSON.stringify(cliUrl)};
+
+        const changes = [
+          {
+            status: 'modified',
+            path: 'forge.config.json',
+          },
+        ];
+
+        const exitCode = await main(
+          ['run'],
+          async () => changes
+        );
+
+        process.exitCode = exitCode;
+      `;
+
+      const forgeRun = spawnSync(process.execPath, ['--import', 'tsx', '--input-type=module', '--eval', script], {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        timeout: 20_000,
+      });
+
+      expect(forgeRun.error).toBeUndefined();
+
+      expect.soft(forgeRun.status, `Forge output:\n${forgeRun.stdout}\n${forgeRun.stderr}`).toBe(1);
+
+      // Confirm that the named project's failing test actually executed.
+      const appFiles = await readdir(appRoot);
+
+      expect.soft(appFiles).toContain('app-results.json');
+
+      if (appFiles.includes('app-results.json')) {
+        const report: unknown = JSON.parse(await readFile(join(appRoot, 'app-results.json'), 'utf8'));
+
+        expect(report).toMatchObject({
+          numTotalTests: 1,
+          numPassedTests: 0,
+          numFailedTests: 1,
+          testResults: [
+            expect.objectContaining({
+              name: expect.stringMatching(/[/\\]tests[/\\]App\.test\.ts$/),
+            }),
+          ],
+        });
+      }
+    } finally {
+      await rm(repoRoot, { recursive: true });
+    }
+  }, 30_000);
 });

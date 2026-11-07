@@ -7,6 +7,28 @@ function isWithinDirectory(directory: string, file: string): boolean {
   return path === '' || (path !== '..' && !path.startsWith(`..${sep}`) && !isAbsolute(path));
 }
 
+function parseVitestFileList(output: string): string[] {
+  const parsed: unknown = JSON.parse(output);
+
+  if (!Array.isArray(parsed)) {
+    throw new Error('Expected Vitest discovery to return an array');
+  }
+
+  return parsed.map((entry: unknown) => {
+    if (
+      typeof entry !== 'object' ||
+      entry === null ||
+      !('file' in entry) ||
+      typeof entry.file !== 'string' ||
+      entry.file.length === 0
+    ) {
+      throw new Error('Invalid Vitest discovery entry');
+    }
+
+    return entry.file;
+  });
+}
+
 export function discoverVitestTestFiles(
   repoRoot: string,
   projectRoot = '.',
@@ -15,7 +37,7 @@ export function discoverVitestTestFiles(
   const projectDirectory = resolve(repoRoot, projectRoot);
 
   return new Promise<string[]>((resolveDiscovery, reject) => {
-    const child = spawn('npx', ['--no-install', 'vitest', 'list', '--filesOnly'], {
+    const child = spawn('npx', ['--no-install', 'vitest', 'list', '--filesOnly', '--json'], {
       cwd: projectDirectory,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -41,21 +63,24 @@ export function discoverVitestTestFiles(
         return;
       }
 
-      const allowDirectories = testRoots.map((root) => resolve(projectDirectory, root));
+      try {
+        const discoveredFiles = parseVitestFileList(output);
 
-      const testFiles = output
-        .split(/\r?\n/)
-        .map((file) => file.trim())
-        .filter(Boolean)
-        .map((file) => resolve(projectDirectory, file))
-        .filter(
-          (file) =>
-            isWithinDirectory(projectDirectory, file) &&
-            allowDirectories.some((directory) => isWithinDirectory(directory, file)),
-        )
-        .map((file) => relative(repoRoot, file).split(sep).join('/'));
+        const allowedDirectories = testRoots.map((root) => resolve(projectDirectory, root));
 
-      resolveDiscovery(testFiles);
+        const testFiles = discoveredFiles
+          .map((file) => resolve(projectDirectory, file))
+          .filter(
+            (file) =>
+              isWithinDirectory(projectDirectory, file) &&
+              allowedDirectories.some((directory) => isWithinDirectory(directory, file)),
+          )
+          .map((file) => relative(repoRoot, file).split(sep).join('/'));
+
+        resolveDiscovery([...new Set(testFiles)]);
+      } catch (error) {
+        reject(new Error(`Invalid Vitest discovery output: ${error instanceof Error ? error.message : String(error)}`));
+      }
     });
   });
 }
