@@ -36,15 +36,15 @@ Current work is concentrated on ensuring that TypeScript targets execute tests i
 
 Seven confirmed defects were established against baseline commit `6aaef70`.
 
-| Issue | Description | Status |
-|---|---|---|
-| #11 | Java discovery ignores configured test directories | Open |
-| #12 | Repository-root Java targets fail path matching | Open |
-| #13 | Dynamic TypeScript imports omit affected tests | Open |
-| #14 | TypeScript path aliases are not correctly analyzed | Open |
-| #15 | Java static imports omit affected tests | Open |
-| #16 | Shared Java sources fail to trigger every affected target | Open |
-| #17 | Nested TypeScript targets execute unrelated root tests | Implementation in PR #19 |
+| Issue | Description                                               | Status                   |
+| ----- | --------------------------------------------------------- | ------------------------ |
+| #11   | Java discovery ignores configured test directories        | Open                     |
+| #12   | Repository-root Java targets fail path matching           | Open                     |
+| #13   | Dynamic TypeScript imports omit affected tests            | Open                     |
+| #14   | TypeScript path aliases are not correctly analyzed        | Open                     |
+| #15   | Java static imports omit affected tests                   | Open                     |
+| #16   | Shared Java sources fail to trigger every affected target | Open                     |
+| #17   | Nested TypeScript targets execute unrelated root tests    | Implementation in PR #19 |
 
 Regressions #11–#16 remain quarantined. The #17 regression has been promoted into normal test execution.
 
@@ -232,15 +232,15 @@ Confirm that all three scenarios pass:
 
 The latest reported local test results, following the P1 correction:
 
-| Verification | Result |
-|---|---|
-| TypeScript typecheck | Passed |
-| ESLint | Passed |
+| Verification              | Result                |
+| ------------------------- | --------------------- |
+| TypeScript typecheck      | Passed                |
+| ESLint                    | Passed                |
 | Unit and regression tests | 101 passed, 7 skipped |
-| Original #17 regression | Passed |
-| Named-project regression | Passed |
-| GitHub Actions | CI run #29 succeeded |
-| P2 collision regression | Not yet implemented |
+| Original #17 regression   | Passed                |
+| Named-project regression  | Passed                |
+| GitHub Actions            | CI run #29 succeeded  |
+| P2 collision regression   | Not yet implemented   |
 
 GitHub Actions successfully completed on commit `8f701b0`.
 
