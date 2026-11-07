@@ -283,4 +283,153 @@ describe('TypeScript target isolation regression', () => {
       await rm(repoRoot, { recursive: true });
     }
   }, 30_000);
+
+  it('#17 executes only the selected file when Vitest paths collide', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'forge-vitest-path-collision-'));
+    const appRoot = join(repoRoot, 'packages/app');
+
+    const selectedTest = 'packages/app/tests/App.test.ts';
+    const excludedTest = 'packages/app/src/tests/App.test.ts';
+
+    const probeScript = `
+    import { createVitest } from 'vitest/node';
+    import { resolve } from 'node:path';
+
+    const vitest = await createVitest({ watch: false });
+
+    try {
+      await vitest.standalone();
+
+      // Exploratory fixture: one configured Vitest project.
+      const project = vitest.projects[0];
+
+      const selected = project.createSpecification(
+        resolve('tests/App.test.ts'),
+      );
+
+      const result = await vitest.runTestSpecifications([selected]);
+
+      console.log(
+        result.testModules.map((module) => ({
+          file: module.moduleId,
+          passed: module.ok(),
+        })),
+      );
+    } finally {
+      await vitest.close();
+    }
+    `;
+
+    async function write(path: string, source: string): Promise<void> {
+      const file = join(repoRoot, path);
+      await mkdir(join(file, '..'), { recursive: true });
+      await writeFile(file, source);
+    }
+
+    try {
+      await symlink(resolve('node_modules'), join(repoRoot, 'node_modules'), 'dir');
+
+      // Vitest is allowed to discover both directories.
+      await write(
+        'packages/app/vitest.config.mjs',
+        `export default {
+          test: {
+            include: ['tests/**/*.test.ts', 'src/tests/**/*.test.ts'],
+            maxWorkers: 1,
+            reporters: ['json'],
+            outputFile: 'app-results.json'
+          }
+         };`,
+      );
+
+      // The selected test passes.
+      await write(
+        selectedTest,
+        `import { test, expect } from 'vitest';
+         test('selected app test', () => expect(true).toBe(true));`,
+      );
+
+      // The excluded test fails if accuidentally executed.
+      await write(
+        excludedTest,
+        `import { test, expect } from 'vitest';
+         test('excluded app test', () => expect(true).toBe(false));`,
+      );
+
+      await write(
+        'packages/app/vitest.probe.mjs',
+        probeScript,
+      );
+
+      const probe = spawnSync(
+        process.execPath,
+        ['vitest.probe.mjs'],
+        {
+          cwd: appRoot,
+          encoding: 'utf8',
+          timeout: 20_000,
+        },
+      );
+
+      console.log('Vitest API probe:', {
+        status: probe.status,
+        stdout: probe.stdout,
+        stderr: probe.stderr,
+      })
+
+      const config: ForgeConfig = {
+        version: '1.0.0',
+        roots: {
+          apps: {
+            app: {
+              path: 'packages/app',
+              sources: ['src'],
+              tests: ['tests'],
+            },
+          },
+        },
+        adapters: { ts: { type: 'typescript' } },
+        runners: { vitest: { type: 'vitest' } },
+        targets: {
+          apps: {
+            tests: {
+              root: 'apps.app',
+              adapter: ['ts'],
+              runner: ['vitest'],
+            },
+          },
+        },
+      };
+
+      const [target] = createValidationTargets(config, resolveTargetConfigs(config));
+
+      // Discovery should only include the configured test root.
+      const discovered = await target.discoverTestFiles(repoRoot);
+
+      expect(discovered).toEqual([selectedTest]);
+      expect(discovered).not.toContain(excludedTest);
+
+      // Execute the selected files using the real vitest runner.
+      const result = await target.runner.run(discovered, repoRoot);
+
+      expect.soft(result.exitCode).toBe(0);
+
+      // Inspect the actual execution report, not just the exit code.
+      const report: unknown = JSON.parse(await readFile(join(appRoot, 'app-results.json'), 'utf8'));
+
+      expect(report).toMatchObject({
+        numTotalTestSuites: 1,
+        numTotalTests: 1,
+        numPassedTests: 1,
+        numFailedTests: 0,
+        testResults: [
+          expect.objectContaining({
+            name: expect.stringMatching(/[/\\]packages[/\\]app[/\\]tests[/\\]App\.test\.ts$/),
+          }),
+        ],
+      });
+    } finally {
+      await rm(repoRoot, { recursive: true });
+    }
+  }, 30_000);
 });
