@@ -291,34 +291,34 @@ describe('TypeScript target isolation regression', () => {
     const selectedTest = 'packages/app/tests/App.test.ts';
     const excludedTest = 'packages/app/src/tests/App.test.ts';
 
-    const probeScript = `
-    import { createVitest } from 'vitest/node';
-    import { resolve } from 'node:path';
+    // const probeScript = `
+    // import { createVitest } from 'vitest/node';
+    // import { resolve } from 'node:path';
 
-    const vitest = await createVitest({ watch: false });
+    // const vitest = await createVitest({ watch: false });
 
-    try {
-      await vitest.standalone();
+    // try {
+    //   await vitest.standalone();
 
-      // Exploratory fixture: one configured Vitest project.
-      const project = vitest.projects[0];
+    //   // Exploratory fixture: one configured Vitest project.
+    //   const project = vitest.projects[0];
 
-      const selected = project.createSpecification(
-        resolve('tests/App.test.ts'),
-      );
+    //   const selected = project.createSpecification(
+    //     resolve('tests/App.test.ts'),
+    //   );
 
-      const result = await vitest.runTestSpecifications([selected]);
+    //   const result = await vitest.runTestSpecifications([selected]);
 
-      console.log(
-        result.testModules.map((module) => ({
-          file: module.moduleId,
-          passed: module.ok(),
-        })),
-      );
-    } finally {
-      await vitest.close();
-    }
-    `;
+    //   console.log(
+    //     result.testModules.map((module) => ({
+    //       file: module.moduleId,
+    //       passed: module.ok(),
+    //     })),
+    //   );
+    // } finally {
+    //   await vitest.close();
+    // }
+    // `;
 
     async function write(path: string, source: string): Promise<void> {
       const file = join(repoRoot, path);
@@ -356,26 +356,19 @@ describe('TypeScript target isolation regression', () => {
          test('excluded app test', () => expect(true).toBe(false));`,
       );
 
-      await write(
-        'packages/app/vitest.probe.mjs',
-        probeScript,
-      );
+      // await write('packages/app/vitest.probe.mjs', probeScript);
 
-      const probe = spawnSync(
-        process.execPath,
-        ['vitest.probe.mjs'],
-        {
-          cwd: appRoot,
-          encoding: 'utf8',
-          timeout: 20_000,
-        },
-      );
+      // const probe = spawnSync(process.execPath, ['vitest.probe.mjs'], {
+      //   cwd: appRoot,
+      //   encoding: 'utf8',
+      //   timeout: 20_000,
+      // });
 
-      console.log('Vitest API probe:', {
-        status: probe.status,
-        stdout: probe.stdout,
-        stderr: probe.stderr,
-      })
+      // console.log('Vitest API probe:', {
+      //   status: probe.status,
+      //   stdout: probe.stdout,
+      //   stderr: probe.stderr,
+      // });
 
       const config: ForgeConfig = {
         version: '1.0.0',
