@@ -56,6 +56,8 @@ async function main(): Promise<void> {
 
   try {
     await vitest.standalone();
+    // Let Vitest discover and classify its own specifications.
+    await vitest.globTestSpecifications();
 
     const specifications = [];
     const expectedFiles = new Set<string>();
@@ -70,15 +72,13 @@ async function main(): Promise<void> {
       expectedFiles.add(absolutePath);
 
       // A file can belong to more than one Vitest project.
-      const matchingProjects = vitest.projects.filter((project) => project.matchesTestGlob(absolutePath));
+      const matchingSpecifications = vitest.getModuleSpecifications(absolutePath);
 
-      if (matchingProjects.length === 0) {
+      if (matchingSpecifications.length === 0) {
         throw new Error(`No Vitest project matches: ${file}`);
       }
 
-      for (const project of matchingProjects) {
-        specifications.push(project.createSpecification(absolutePath));
-      }
+      specifications.push(...matchingSpecifications);
     }
 
     const result = await vitest.runTestSpecifications(specifications);

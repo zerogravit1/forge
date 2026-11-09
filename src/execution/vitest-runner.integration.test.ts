@@ -186,6 +186,21 @@ describe('Vitest runner integration', () => {
       );
 
       await write(
+        'packages/app/tsconfig.json',
+        JSON.stringify({
+          compilerOptions: {
+            target: 'ES2022',
+            module: 'ESNext',
+            moduleResolution: 'Bundler',
+            strict: true,
+            noEmit: true,
+            skipLibCheck: true,
+          },
+          include: ['tests/**/*.test.ts'],
+        }),
+      );
+
+      await write(
         'packages/app/tests/Types.test.ts',
         `import { test, expect } from 'vitest';
 
@@ -211,7 +226,7 @@ describe('Vitest runner integration', () => {
       expect(direct.status, `${direct.stdout}\n${direct.stderr}`).toBe(1);
       expect(`${direct.stdout}\n${direct.stderr}`).toMatch(/TS2322|not assignable to type/i);
 
-      // Forge must preserve the upstream coverage failure.
+      // Forge must preserve the upstream typecheck failure.
       const runner = createVitestRunner('packages/app');
 
       const result = await runner.run(['packages/app/tests/Types.test.ts'], repoRoot);
