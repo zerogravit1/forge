@@ -21,7 +21,7 @@ describe('reconcileSpecifications', () => {
         id: 'typecheck-id',
         moduleId: file,
         state: () => 'passed',
-      }
+      },
     ];
 
     const result = reconcileSpecifications(expected, actual);
@@ -58,9 +58,7 @@ describe('reconcileSpecifications', () => {
   it('returns an expected specification id', () => {
     const file = '/repo/tests/Types.test.ts';
 
-    const expected = [
-      { taskId: 'runtime-id', moduleId: file },
-    ];
+    const expected = [{ taskId: 'runtime-id', moduleId: file }];
 
     const actual = [
       {
@@ -72,7 +70,7 @@ describe('reconcileSpecifications', () => {
         id: 'typecheck-id',
         moduleId: file,
         state: () => 'passed',
-      }
+      },
     ];
 
     const result = reconcileSpecifications(expected, actual);
@@ -93,7 +91,7 @@ describe('reconcileSpecifications', () => {
         id: 'runtime-id',
         moduleId: file,
         state: () => 'passed',
-      }
+      },
     ];
 
     const result = reconcileSpecifications(expected, actual);
@@ -104,16 +102,14 @@ describe('reconcileSpecifications', () => {
   it('returns a incomplete specification id', () => {
     const file = '/repo/tests/Types.test.ts';
 
-    const expected = [
-      { taskId: 'runtime-id' },
-    ];
+    const expected = [{ taskId: 'runtime-id' }];
 
     const actual = [
       {
         id: 'runtime-id',
         moduleId: file,
         state: () => 'pending',
-      }
+      },
     ];
 
     const result = reconcileSpecifications(expected, actual);

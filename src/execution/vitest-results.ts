@@ -38,7 +38,7 @@ export function reconcileSpecifications(
   const duplicates = [
     ...new Set([
       ...[...expectedCounts].filter(([, count]) => count > 1).map(([id]) => id),
-      ...[...counts].filter(([,count]) => count > 1).map(([id]) =>id),
+      ...[...counts].filter(([, count]) => count > 1).map(([id]) => id),
     ]),
   ];
 
