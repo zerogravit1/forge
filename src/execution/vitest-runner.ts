@@ -1,6 +1,7 @@
 import type { TestRunner } from './test-runner.js';
 import { runCommand } from './command-runner.js';
 import { resolve, relative, isAbsolute, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export function createVitestRunner(projectRoot = '.', execute: typeof runCommand = runCommand): TestRunner {
   return {
@@ -33,7 +34,16 @@ export function createVitestRunner(projectRoot = '.', execute: typeof runCommand
         return projectRelativePath.split(sep).join('/');
       });
 
-      const exitCode = await execute('npx', ['--no-install', 'vitest', 'run', ...projectTestFiles], projectDirectory);
+      // Source execution uses .ts; compiled execution uses .js.
+      const extension = import.meta.url.endsWith('.ts') ? '.ts' : '.js';
+
+      const workerPath = fileURLToPath(new URL(`./vitest-worker${extension}`, import.meta.url));
+
+      const manifest = JSON.stringify({
+        testFiles: projectTestFiles,
+      });
+
+      const exitCode = await execute(process.execPath, [workerPath], projectDirectory, manifest);
 
       return { exitCode };
     },

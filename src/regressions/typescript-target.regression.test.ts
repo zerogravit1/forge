@@ -356,6 +356,13 @@ describe('TypeScript target isolation regression', () => {
          test('excluded app test', () => expect(true).toBe(false));`,
       );
 
+      await write(
+        'packages/app/src/tests/App.test.tsx',
+        `import { test, expect } from 'vitest';
+         test('excluded tsx app test', () => expect(true).toBe(false));
+        `
+      )
+
       // await write('packages/app/vitest.probe.mjs', probeScript);
 
       // const probe = spawnSync(process.execPath, ['vitest.probe.mjs'], {

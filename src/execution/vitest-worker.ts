@@ -18,9 +18,7 @@ async function readManifest(): Promise<string[]> {
     !('testFiles' in parsed) ||
     !Array.isArray(parsed.testFiles) ||
     parsed.testFiles.length === 0 ||
-    parsed.testFiles.some(
-      (file: unknown) => typeof file !== 'string' || file.length === 0,
-    )
+    parsed.testFiles.some((file: unknown) => typeof file !== 'string' || file.length === 0)
   ) {
     throw new Error('Invalid Vitest execution manifest');
   }
@@ -36,12 +34,7 @@ function resolveTestPath(projectRoot: string, file: string): string {
   const absolutePath = resolve(projectRoot, file);
   const relativePath = relative(projectRoot, absolutePath);
 
-  if (
-    !relativePath ||
-    relativePath === '..' ||
-    relativePath.startsWith(`..${sep}`) ||
-    isAbsolute(relativePath)
-  ) {
+  if (!relativePath || relativePath === '..' || relativePath.startsWith(`..${sep}`) || isAbsolute(relativePath)) {
     throw new Error(`Test file outside configured project: ${file}`);
   }
 
@@ -53,15 +46,11 @@ async function main(): Promise<void> {
   const testFiles = await readManifest();
 
   // Resolve Vitest from the target prokect, not from Forge.
-  const projectRequire = createRequire(
-    resolve(projectRoot, '__forge_vitest_resolver__.cjs'),
-  );
+  const projectRequire = createRequire(resolve(projectRoot, '__forge_vitest_resolver__.cjs'));
 
   const vitestModule = projectRequire.resolve('vitest/node');
 
-  const { createVitest } = (await import(
-    pathToFileURL(vitestModule).href
-  )) as typeof import('vitest/node');
+  const { createVitest } = (await import(pathToFileURL(vitestModule).href)) as typeof import('vitest/node');
 
   const vitest = await createVitest({ watch: false });
 
@@ -81,9 +70,7 @@ async function main(): Promise<void> {
       expectedFiles.add(absolutePath);
 
       // A file can belong to more than one Vitest project.
-      const matchingProjects = vitest.projects.filter((project) =>
-        project.matchesTestGlob(absolutePath),
-      );
+      const matchingProjects = vitest.projects.filter((project) => project.matchesTestGlob(absolutePath));
 
       if (matchingProjects.length === 0) {
         throw new Error(`No Vitest project matches: ${file}`);
@@ -96,17 +83,11 @@ async function main(): Promise<void> {
 
     const result = await vitest.runTestSpecifications(specifications);
 
-    const executedFiles = new Set(
-      result.testModules.map((module) => resolve(module.moduleId)),
-    );
+    const executedFiles = new Set(result.testModules.map((module) => resolve(module.moduleId)));
 
-    const missingFiles = [...expectedFiles].filter(
-      (file) => !executedFiles.has(file),
-    );
+    const missingFiles = [...expectedFiles].filter((file) => !executedFiles.has(file));
 
-    const unexpectedFiles = [...executedFiles].filter(
-      (file) => !expectedFiles.has(file),
-    );
+    const unexpectedFiles = [...executedFiles].filter((file) => !expectedFiles.has(file));
 
     const failed =
       result.unhandledErrors.length > 0 ||

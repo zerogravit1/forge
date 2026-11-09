@@ -33,13 +33,8 @@ describe('runCommand', () => {
       });
     `;
 
-    const exitCode = await runCommand(
-      process.execPath,
-      ['-e', script],
-      undefined,
-      manifest,
-    );
+    const exitCode = await runCommand(process.execPath, ['-e', script], undefined, manifest);
 
-    expect(exitCode).toBe(0)
+    expect(exitCode).toBe(0);
   });
 });

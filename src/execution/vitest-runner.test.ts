@@ -14,9 +14,12 @@ describe('createVitestRunner', () => {
     expect(execute).toHaveBeenCalledOnce();
 
     expect(execute).toHaveBeenCalledWith(
-      'npx',
-      ['--no-install', 'vitest', 'run', 'src/cli.test.ts', 'src/selection/select-tests.test.ts'],
+      process.execPath,
+      [expect.stringMatching(/vitest-worker\.(ts|js)$/)],
       process.cwd(),
+      JSON.stringify({
+        testFiles: ['src/cli.test.ts', 'src/selection/select-tests.test.ts'],
+      }),
     );
 
     expect(result).toEqual({ exitCode: 0 });
@@ -51,9 +54,12 @@ describe('createVitestRunner', () => {
     expect(execute).toHaveBeenCalledOnce();
 
     expect(execute).toHaveBeenCalledWith(
-      'npx',
-      ['--no-install', 'vitest', 'run', 'tests/App.test.ts', 'tests/Orders.test.ts'],
+      process.execPath,
+      [expect.stringMatching(/vitest-worker\.(ts|js)$/)],
       resolve(repoRoot, 'packages/app'),
+      JSON.stringify({
+        testFiles: ['tests/App.test.ts', 'tests/Orders.test.ts'],
+      }),
     );
 
     expect(result).toEqual({ exitCode: 0 });

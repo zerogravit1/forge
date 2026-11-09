@@ -1,11 +1,6 @@
 import { spawn } from 'node:child_process';
 
-export function runCommand(
-  command: string,
-  args: string[] = [],
-  cwd?: string,
-  input?: string,
-): Promise<number> {
+export function runCommand(command: string, args: string[] = [], cwd?: string, input?: string): Promise<number> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       stdio: input === undefined ? 'inherit' : ['pipe', 'inherit', 'inherit'],
