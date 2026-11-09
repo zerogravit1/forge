@@ -102,7 +102,9 @@ async function main(): Promise<void> {
       });
     }
 
-    process.exitCode = failed ? 1 : 0;
+    if (failed) {
+      process.exitCode = process.exitCode || 1;
+    }
   } finally {
     await vitest.close();
   }

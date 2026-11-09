@@ -5,7 +5,6 @@ import { fileURLToPath } from 'node:url';
 import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { createVitestRunner } from './vitest-runner.js';
 
 describe('Vitest worker integration', () => {
   it('returns a nonzero exit code for malformed JSON manifests', () => {
