@@ -52,7 +52,12 @@ describe('reconcileSpecifications', () => {
 
     const result = reconcileSpecifications(expected, actual);
 
-    expect(result.missing).toEqual(['typecheck-id']);
+    expect(result).toEqual({
+      missing: ['typecheck-id'],
+      unexpected: [],
+      duplicates: [],
+      incomplete: [],
+    });
   });
 
   it('returns an expected specification id', () => {
@@ -75,7 +80,12 @@ describe('reconcileSpecifications', () => {
 
     const result = reconcileSpecifications(expected, actual);
 
-    expect(result.unexpected).toEqual(['typecheck-id']);
+    expect(result).toEqual({
+      missing: [],
+      unexpected: ['typecheck-id'],
+      duplicates: [],
+      incomplete: [],
+    });
   });
 
   it('detects duplicate expected specifications IDs', () => {
@@ -96,7 +106,42 @@ describe('reconcileSpecifications', () => {
 
     const result = reconcileSpecifications(expected, actual);
 
-    expect(result.duplicates).toEqual(['runtime-id']);
+    expect(result).toEqual({
+      missing: [],
+      unexpected: [],
+      duplicates: ['runtime-id'],
+      incomplete: [],
+    });
+  });
+
+  it('detects duplicate actual specifications IDs', () => {
+    const file = '/repo/tests/Types.test.ts';
+
+    const expected = [
+      { taskId: 'runtime-id', moduleId: file },
+    ];
+
+    const actual = [
+      {
+        id: 'runtime-id',
+        moduleId: file,
+        state: () => 'passed',
+      },
+      {
+        id: 'runtime-id',
+        moduleId: file,
+        state: () => 'passed'
+      }
+    ];
+
+    const result = reconcileSpecifications(expected, actual);
+
+    expect(result).toEqual({
+      missing: [],
+      unexpected: [],
+      duplicates: ['runtime-id'],
+      incomplete: [],
+    });
   });
 
   it('returns a incomplete specification id', () => {
@@ -114,6 +159,11 @@ describe('reconcileSpecifications', () => {
 
     const result = reconcileSpecifications(expected, actual);
 
-    expect(result.incomplete).toEqual(['runtime-id']);
+    expect(result).toEqual({
+      missing: [],
+      unexpected: [],
+      duplicates: [],
+      incomplete: ['runtime-id'],
+    });
   });
 });
