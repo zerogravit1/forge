@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mkdtemp, mkdir, readFile, rm , symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -10,10 +10,7 @@ describe('Vitest runner integration', () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'forge-vitest-multiple-'));
     const appRoot = join(repoRoot, 'packages/app');
 
-    const selectedTests = [
-      'packages/app/tests/App.test.ts',
-      'packages/app/tests/Orders.test.ts',
-    ];
+    const selectedTests = ['packages/app/tests/App.test.ts', 'packages/app/tests/Orders.test.ts'];
 
     async function write(path: string, content: string): Promise<void> {
       const file = join(repoRoot, path);
@@ -63,9 +60,7 @@ describe('Vitest runner integration', () => {
 
       expect.soft(result.exitCode).toBe(0);
 
-      const report: unknown = JSON.parse(
-        await readFile(join(appRoot, 'app-results.json'), 'utf8'),
-      );
+      const report: unknown = JSON.parse(await readFile(join(appRoot, 'app-results.json'), 'utf8'));
 
       expect(report).toMatchObject({
         numTotalTestSuites: 2,

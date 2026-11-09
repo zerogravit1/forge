@@ -4,20 +4,14 @@ import { fileURLToPath } from 'node:url';
 
 describe('Vitest worker integration', () => {
   it('returns a nonzero exit code for malformed JSON manifests', () => {
-    const workerPath = fileURLToPath(
-      new URL('./vitest-worker.ts', import.meta.url),
-    );
+    const workerPath = fileURLToPath(new URL('./vitest-worker.ts', import.meta.url));
 
-    const result = spawnSync(
-      process.execPath,
-      [workerPath],
-      {
-        cwd: process.cwd(),
-        input: '{"testFiles":[',
-        encoding: 'utf8',
-        timeout: 20_000,
-      },
-    );
+    const result = spawnSync(process.execPath, [workerPath], {
+      cwd: process.cwd(),
+      input: '{"testFiles":[',
+      encoding: 'utf8',
+      timeout: 20_000,
+    });
 
     expect(result.error).toBeUndefined();
     expect(result.status).toBe(1);
@@ -30,9 +24,7 @@ describe('Vitest worker integration', () => {
     ['non-array testFiles', '{"testFiles":"App.test.ts"}'],
     ['invalid file entry', '{"testFiles":[42]}'],
   ])('rejects a manifest with %s', (_description, input) => {
-    const workerPath = fileURLToPath(
-      new URL('./vitest-worker.ts', import.meta.url),
-    );
+    const workerPath = fileURLToPath(new URL('./vitest-worker.ts', import.meta.url));
 
     const result = spawnSync(process.execPath, [workerPath], {
       cwd: process.cwd(),
@@ -44,5 +36,22 @@ describe('Vitest worker integration', () => {
     expect(result.error).toBeUndefined();
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('Invalid Vitest execution manifest');
-  })
+  });
+
+  it('returns a nonzero exit code when a selected test file does not exist', () => {
+    const workerPath = fileURLToPath(new URL('./vitest-worker.ts', import.meta.url));
+
+    const result = spawnSync(process.execPath, [workerPath], {
+      cwd: process.cwd(),
+      input: JSON.stringify({
+        testFiles: ['src/execution/DefinitelyMissing.test.ts'],
+      }),
+      encoding: 'utf8',
+      timeout: 20_000,
+    });
+
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('ENOENT');
+  });
 });
