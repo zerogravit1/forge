@@ -93,7 +93,7 @@ describe('Vitest runner integration', () => {
     }
 
     try {
-      await symlink(resolve('node_moules'), join(repoRoot, 'node_modules'), 'dir');
+      await symlink(resolve('node_modules'), join(repoRoot, 'node_modules'), 'dir');
 
       await write(
         'packages/app/vitest.config.ts',
