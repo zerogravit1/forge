@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 import { createVitestRunner } from './vitest-runner.js';
 
@@ -78,6 +79,82 @@ describe('Vitest runner integration', () => {
       });
     } finally {
       await rm(repoRoot, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it('preserves Vitest coverage threshold failures', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'forge-vitest-coverage-'));
+    const appRoot = join(repoRoot, 'packages/app');
+
+    async function write(path: string, content: string): Promise<void> {
+      const file = join(repoRoot, path);
+      await mkdir(join(file, '..'), { recursive: true });
+      await writeFile(file, content);
+    }
+
+    try {
+      await symlink(resolve('node_moules'), join(repoRoot, 'node_modules'), 'dir');
+
+      await write(
+        'packages/app/vitest.config.ts',
+        `export default {
+          test: {
+            include: ['tests/**/*.test.ts'],
+            maxWorkers: 1,
+            coverage: {
+              enabled: true,
+              provider: 'v8',
+              include: ['src/branch.ts'],
+              reporter: ['text'],
+              thresholds: {
+                branches: 100
+              }
+            }
+          }
+        };`,
+      );
+
+      await write(
+        'packages/app/src/branch.ts',
+        `export function branch(flag: boolean): string {
+          if (flag) return 'yes';
+          return 'no';
+        }`,
+      );
+
+      await write(
+        'packages/app/tests/Branch.test.ts',
+        `import { test, expect } from 'vitest';
+         import { branch } from '../src/branch.ts';
+
+         test('selected branch passes', () => {
+          expect(branch(true)).toBe('yes');
+         });`,
+      );
+
+      // Establish upstream behavior before testing Forge.
+      const direct = spawnSync(
+        process.execPath,
+        [resolve('node_modules/vitest/vitest.mjs'), 'run', 'tests/Branch.test.ts'],
+        {
+          cwd: appRoot,
+          encoding: 'utf8',
+          timeout: 20_000,
+        },
+      );
+
+      expect(direct.error).toBeUndefined();
+      expect(direct.status, `${direct.stdout}\n${direct.stderr}`).toBe(1);
+      expect(`${direct.stdout}\n${direct.stderr}`).toMatch(/coverage for branches/i);
+
+      // Forge must preserve the upstream coverage failure.
+      const runner = createVitestRunner('packages/app');
+
+      const result = await runner.run(['packages/app/tests/Branch.test.ts'], repoRoot);
+
+      expect(result.exitCode).toBe(1);
+    } finally {
+      await rm(repoRoot, { recursive: true });
     }
   }, 30_000);
 });
