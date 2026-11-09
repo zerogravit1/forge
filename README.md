@@ -280,11 +280,11 @@ The opt-in regression suite is expected to fail until the remaining defects are 
 - [x] Correct P1 with structured discovery output.
 - [x] Add permanent named-project regression coverage.
 - [x] Validate P1 changes in GitHub Actions.
-- [ ] Add failing regression for P2 path collisions.
-- [ ] Implement exact-file execution.
-- [ ] Verify the P2 regression passes.
-- [ ] Run `npm run check`.
-- [ ] Remove the leftover commented diagnostic `// console.error(error);` in `src/cli.ts`.
+- [x] Add failing regression for P2 path collisions.
+- [x] Implement exact-file execution.
+- [x] Verify the P2 regression passes.
+- [x] Run `npm run check`.
+- [x] Remove the leftover commented diagnostic `// console.error(error);` in `src/cli.ts`.
 - [ ] Push final changes to PR #19.
 - [ ] Request a follow-up Codex review.
 - [ ] Resolve review findings and confirm green CI.
