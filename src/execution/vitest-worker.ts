@@ -52,7 +52,8 @@ async function main(): Promise<void> {
 
   const { createVitest } = (await import(pathToFileURL(vitestModule).href)) as typeof import('vitest/node');
 
-  const vitest = await createVitest({ watch: false });
+  // Added 'test' to support Vitest 4 & 5, IDE shows a deprecation warning
+  const vitest = await createVitest('test', { watch: false });
 
   try {
     await vitest.standalone();
