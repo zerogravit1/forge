@@ -2,7 +2,6 @@ import { stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { reconcileSpecifications } from './vitest-results.js';
 
 async function readManifest(): Promise<string[]> {
   let input = '';
