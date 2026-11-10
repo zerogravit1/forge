@@ -25,7 +25,7 @@ export async function withTempRepository<T>(prefix: string, run: (repo: TempRepo
       },
 
       async linkNodeModules() {
-        await symlink(resolve('nod_modules'), path('node_modules'), 'dir');
+        await symlink(resolve('node_modules'), path('node_modules'), 'dir');
       },
     });
   } finally {

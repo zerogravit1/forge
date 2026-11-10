@@ -90,7 +90,7 @@ async function main(): Promise<void> {
       specifications.push(...matchingSpecifications);
     }
 
-    const result = await vitest.runTestSpecifications(specifications);
+    const result = await vitest.runTestSpecifications(specifications, true);
 
     const reconciliation = reconcileSpecifications(specifications, result.testModules);
 

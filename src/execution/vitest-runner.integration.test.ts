@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { stripVTControlCharacters } from 'node:util';
 
 import { createVitestRunner } from './vitest-runner.js';
 import { withTempRepository } from '../helpers/temp-repo.js';
@@ -280,7 +281,7 @@ describe('Vitest runner integration', () => {
       // Direct Vitest must count the untested source file.
       const direct = spawnSync(
         process.execPath,
-        [resolve('node_modules/vitest/vitest.mjs'), 'run', 'tests/Covered.Test.ts'],
+        [resolve('node_modules/vitest/vitest.mjs'), 'run', 'tests/Covered.test.ts'],
         {
           cwd: appRoot,
           encoding: 'utf8',
@@ -288,12 +289,13 @@ describe('Vitest runner integration', () => {
         },
       );
 
-      const directOutput = `${direct.stdout}\n${direct.stderr}`;
+      const directOutput = stripVTControlCharacters(`${direct.stdout}\n${direct.stderr}`);
 
       expect(direct.error).toBeUndefined();
       expect(direct.status, directOutput).toBe(1);
       expect(directOutput).toContain('uncovered.ts');
       expect(directOutput).toMatch(/coverage for lines/i);
+      expect(directOutput).toMatch(/Tests\s+1 passed/);
 
       // Forge must report the same coverage failure.
       const runner = createVitestRunner('packages/app');
