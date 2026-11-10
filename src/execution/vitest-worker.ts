@@ -123,7 +123,7 @@ async function main(): Promise<void> {
       process.exitCode = process.exitCode || 1;
     }
   } finally {
-    await vitest.close();
+    await vitest.exit();
   }
 }
 

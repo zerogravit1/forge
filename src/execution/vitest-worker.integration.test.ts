@@ -99,4 +99,70 @@ describe('Vitest worker integration', () => {
       await rm(projectRoot, { recursive: true, force: true });
     }
   }, 30_000);
+
+  it('terminates within the configured teardown timeout', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'forge-vitest-shutdown-'));
+    const workerPath = fileURLToPath(new URL('./vitest-worker.ts', import.meta.url));
+
+    try {
+      await symlink(resolve('node_modules'), join(projectRoot, 'node_modules'), 'dir');
+      await mkdir(join(projectRoot, 'tests'), { recursive: true });
+
+      await writeFile(
+        join(projectRoot, 'vitest.config.mjs'),
+        `export default {
+          test: {
+            include: ['tests/**/*.test.ts'],
+            globalSetup: ['./global-setup.mjs'],
+            teardownTimeout: 300,
+            maxWorkers: 1
+          }
+        };`,
+      );
+
+      await writeFile(
+        join(projectRoot, 'global-setup.mjs'),
+        `export default function setup() {
+          setInterval(() => {}, 1000);
+        }`,
+      );
+
+      await writeFile(
+        join(projectRoot, 'tests/App.test.ts'),
+        `import { test, expect } from 'vitest';
+         test('passes', () => expect(true).toBe(true));`,
+      );
+
+      // Establish direct Vitest behavior
+      const direct = spawnSync(
+        process.execPath,
+        [resolve('node_modules/vitest/vitest.mjs'), 'run', 'tests/App.test.ts'],
+        {
+          cwd: projectRoot,
+          encoding: 'utf8',
+          timeout: 5000,
+          killSignal: 'SIGKILL',
+        },
+      );
+
+      expect(direct.error).toBeUndefined();
+      expect(direct.status).not.toBeNull();
+      expect(`${direct.stdout}\n${direct.stderr}`).toMatch(/1 passed/);
+
+      // Forge must also complete and exit without external termination.
+      const worker = spawnSync(process.execPath, [workerPath], {
+        cwd: projectRoot,
+        input: JSON.stringify({ testFiles: ['tests/App.test.ts'] }),
+        encoding: 'utf8',
+        timeout: 5000,
+        killSignal: 'SIGKILL',
+      });
+
+      expect(worker.error).toBeUndefined();
+      expect(worker.status).toBe(0);
+      expect(`${worker.stdout}\n${worker.stderr}`).toMatch(/1 passed/);
+    } finally {
+      await rm(projectRoot, { recursive: true });
+    }
+  }, 20_000);
 });
