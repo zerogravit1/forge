@@ -34,7 +34,7 @@ describe('reconcileSpecifications', () => {
     });
   });
 
-  it('detects a missing typecheck specificiation', () => {
+  it('detects a missing typecheck specification', () => {
     const file = '/repo/tests/Types.test.ts';
 
     const expected = [
@@ -144,7 +144,7 @@ describe('reconcileSpecifications', () => {
     });
   });
 
-  it('returns a incomplete specification id', () => {
+  it('returns an incomplete specification id', () => {
     const file = '/repo/tests/Types.test.ts';
 
     const expected = [{ taskId: 'runtime-id' }];
@@ -154,6 +154,29 @@ describe('reconcileSpecifications', () => {
         id: 'runtime-id',
         moduleId: file,
         state: () => 'pending',
+      },
+    ];
+
+    const result = reconcileSpecifications(expected, actual);
+
+    expect(result).toEqual({
+      missing: [],
+      unexpected: [],
+      duplicates: [],
+      incomplete: ['runtime-id'],
+    });
+  });
+
+  it('detects a queued specification id as incomplete', () => {
+    const file = '/repo/tests/Types.test.ts';
+
+    const expected = [{ taskId: 'runtime-id', moduleId: file }];
+
+    const actual = [
+      {
+        id: 'runtime-id',
+        moduleId: file,
+        state: () => 'queued',
       },
     ];
 
