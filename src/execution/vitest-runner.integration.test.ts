@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 import { createVitestRunner } from './vitest-runner.js';
+import { withTempRepository } from '../helpers/temp-repo.js';
 
 describe('Vitest runner integration', () => {
   it('executes multiple selected files without including colliding paths', async () => {
@@ -236,4 +237,153 @@ describe('Vitest runner integration', () => {
       await rm(repoRoot, { recursive: true });
     }
   }, 30_000);
+
+  it('includes untested source files in coverage thresholds', async () => {
+    await withTempRepository('forge-vitest-uncovered', async (repo) => {
+      await repo.linkNodeModules();
+
+      const appRoot = repo.path('packages/app');
+
+      await repo.write(
+        'packages/app/vitest.config.mjs',
+        `export default {
+          test: {
+            include: ['tests/**/*.test.ts'],
+            maxWorkers: 1,
+            coverage: {
+              enabled: true,
+              provider: 'v8',
+              include: ['src/**/*.ts'],
+              reporter: ['text'],
+              thresholds: {
+                lines: 100
+              }
+            }
+          }
+        };`,
+      );
+
+      await repo.write('packages/app/src/covered.ts', `export const covered = () => 'covered';`);
+
+      await repo.write('packages/app/src/uncovered.ts', `export const covered = () => 'uncovered';`);
+
+      await repo.write(
+        'packages/app/tests/Covered.test.ts',
+        `import { test, expect } from 'vitest';
+         import { covered } from '../src/covered.ts';
+         
+         test('covered function passes', () => {
+          expect(covered()).toBe('covered');
+         });`,
+      );
+
+      // Direct Vitest must count the untested source file.
+      const direct = spawnSync(
+        process.execPath,
+        [resolve('node_modules/vitest/vitest.mjs'), 'run', 'tests/Covered.Test.ts'],
+        {
+          cwd: appRoot,
+          encoding: 'utf8',
+          timeout: 20_000,
+        },
+      );
+
+      const directOutput = `${direct.stdout}\n${direct.stderr}`;
+
+      expect(direct.error).toBeUndefined();
+      expect(direct.status, directOutput).toBe(1);
+      expect(directOutput).toContain('uncovered.ts');
+      expect(directOutput).toMatch(/coverage for lines/i);
+
+      // Forge must report the same coverage failure.
+      const runner = createVitestRunner('packages/app');
+
+      const result = await runner.run(['packages/app/tests/Covered.test.ts'], repo.root);
+
+      expect(result.exitCode).toBe(1);
+    });
+  }, 30_000);
+
+  //   const repoRoot = await mkdtemp(join(tmpdir(), 'forge-vitest-uncovered-'));
+  //   const appRoot = join(repoRoot, 'packages/app');
+
+  //   async function write(path: string, content: string): Promise<void> {
+  //     const file = join(repoRoot, path);
+  //     await mkdir(join(file, '..'), { recursive: true });
+  //     await writeFile(file, content);
+  //   }
+
+  //   try {
+  //     await symlink(resolve('node_modules'), join(repoRoot, 'node_modules'), 'dir');
+
+  //     await write(
+  //       'packages/app/vitest.config.mjs',
+  //       `export default {
+  //         test: {
+  //           include: ['tests/**/*.test.ts'],
+  //           maxWorkers: 1,
+  //           coverage: {
+  //             enabled: true,
+  //             provider: 'v8',
+  //             include: ['src/**/*.ts'],
+  //             reporter: ['text'],
+  //             thresholds: {
+  //               lines: 100
+  //             }
+  //           }
+  //         }
+  //       };`,
+  //     );
+
+  //     await write(
+  //       'packages/app/src/covered.ts',
+  //       `export const covered = () => 'covered';`,
+  //     );
+
+  //     await write(
+  //       'packages/app/src/uncovered.ts',
+  //       `export const covered = () => 'uncovered';`,
+  //     );
+
+  //     await write(
+  //       'packages/app/tests/Covered.test.ts',
+  //       `import { test, expect } from 'vitest';
+  //        import { covered } from '../src/covered.ts';
+
+  //        test('covered function passes', () => {
+  //         expect(covered()).toBe('covered');
+  //        });`
+  //     );
+
+  //     // Direct Vitest must count the untested source file.
+  //     const direct = spawnSync(
+  //       process.execPath,
+  //       [resolve('node_modules/vitest/vitest.mjs'), 'run', 'tests/Covered.Test.ts'],
+  //       {
+  //         cwd: appRoot,
+  //         encoding: 'utf8',
+  //         timeout: 20_000,
+  //       },
+  //     );
+
+  //     const directOutput = `${direct.stdout}\n${direct.stderr}`;
+
+  //     expect(direct.error).toBeUndefined();
+  //     expect(direct.status, directOutput).toBe(1);
+  //     expect(directOutput).toContain('uncovered.ts');
+  //     expect(directOutput).toMatch(/coverage for lines/i);
+
+  //     // Forge must report the same coverage failure.
+  //     const runner = createVitestRunner('packages/app');
+
+  //     const result = await runner.run(
+  //       ['packages/app/tests/Covered.test.ts'],
+  //       repoRoot,
+  //     );
+
+  //     expect(result.exitCode).toBe(1);
+  //   } finally {
+  //     await rm(repoRoot, { recursive: true, force: true });
+  //   }
+  // }, 30_000);
 });
