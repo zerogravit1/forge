@@ -117,9 +117,7 @@ describe('reconcileSpecifications', () => {
   it('detects duplicate actual specifications IDs', () => {
     const file = '/repo/tests/Types.test.ts';
 
-    const expected = [
-      { taskId: 'runtime-id', moduleId: file },
-    ];
+    const expected = [{ taskId: 'runtime-id', moduleId: file }];
 
     const actual = [
       {
@@ -130,8 +128,8 @@ describe('reconcileSpecifications', () => {
       {
         id: 'runtime-id',
         moduleId: file,
-        state: () => 'passed'
-      }
+        state: () => 'passed',
+      },
     ];
 
     const result = reconcileSpecifications(expected, actual);

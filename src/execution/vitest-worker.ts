@@ -2,6 +2,7 @@ import { stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { reconcileSpecifications } from './vitest-results.js';
 
 async function readManifest(): Promise<string[]> {
   let input = '';
@@ -45,7 +46,7 @@ async function main(): Promise<void> {
   const projectRoot = process.cwd();
   const testFiles = await readManifest();
 
-  // Resolve Vitest from the target prokect, not from Forge.
+  // Resolve Vitest from the target project, not from Forge.
   const projectRequire = createRequire(resolve(projectRoot, '__forge_vitest_resolver__.cjs'));
 
   const vitestModule = projectRequire.resolve('vitest/node');
@@ -56,6 +57,14 @@ async function main(): Promise<void> {
 
   try {
     await vitest.standalone();
+
+    // Match the helper extension to the runner worker.
+    const extension = import.meta.url.endsWith('.ts') ? '.ts' : '.js';
+
+    const { reconcileSpecifications } = (await import(
+      new URL(`./vitest-results${extension}`, import.meta.url).href
+    )) as typeof import('./vitest-results.js');
+
     // Let Vitest discover and classify its own specifications.
     await vitest.globTestSpecifications();
 
@@ -83,6 +92,14 @@ async function main(): Promise<void> {
 
     const result = await vitest.runTestSpecifications(specifications);
 
+    const reconciliation = reconcileSpecifications(specifications, result.testModules);
+
+    const hasMismatch = Object.values(reconciliation).some((ids) => ids.length > 0);
+
+    if (hasMismatch) {
+      console.error('Vitest specification mismatch', reconciliation);
+    }
+
     const executedFiles = new Set(result.testModules.map((module) => resolve(module.moduleId)));
 
     const missingFiles = [...expectedFiles].filter((file) => !executedFiles.has(file));
@@ -92,6 +109,7 @@ async function main(): Promise<void> {
     const failed =
       result.unhandledErrors.length > 0 ||
       result.testModules.some((module) => !module.ok()) ||
+      hasMismatch ||
       missingFiles.length > 0 ||
       unexpectedFiles.length > 0;
 
