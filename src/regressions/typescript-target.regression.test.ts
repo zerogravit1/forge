@@ -393,4 +393,113 @@ describe('TypeScript target isolation regression', () => {
       await rm(repoRoot, { recursive: true });
     }
   }, 30_000);
+
+  it('#17 discovers tests through a symlinked project root', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'forge-symlinked-root-'));
+
+    const appRoot = join(repoRoot, 'packages/app');
+    const realTest = join(repoRoot, 'real/app/tests/App.test.ts');
+    const configuredTest = 'packages/app/tests/App.test.ts';
+
+    async function write(path: string, content: string): Promise<void> {
+      const file = join(repoRoot, path);
+      await mkdir(join(file, '..'), { recursive: true });
+      await writeFile(file, content);
+    }
+
+    try {
+      // Allow the temporary project to use FOrge's installed Vitest.
+      await symlink(resolve('node_modules'), join(repoRoot, 'node_modules'), 'dir');
+
+      // Create the actual project first.
+      await write(
+        'real/app/vitest.config.mjs',
+        `export default {
+          test: {
+            include: ['tests/**/*.test.ts'],
+            maxWorkers: 1,
+            reporters: ['json'],
+            outputFile: 'app-results.json'
+          }
+        };`,
+      );
+
+      await write(
+        'real/app/tests/App.test.ts',
+        `import { test, expect } from 'vitest';
+         test('app failure', () => expect(true).toBe(false));`,
+      );
+
+      // Expose the real project through the configured package path.
+      await mkdir(join(repoRoot, 'packages'), { recursive: true });
+      await symlink('../real/app', appRoot, 'dir');
+
+      // Establish that upstream Vitest discovers the test.
+      const direct = spawnSync(
+        process.execPath,
+        [resolve('node_modules/vitest/vitest.mjs'), 'list', '--filesOnly', '--json'],
+        {
+          cwd: appRoot,
+          encoding: 'utf8',
+          timeout: 20_000,
+        },
+      );
+
+      expect(direct.error).toBeUndefined();
+      expect(direct.status, `${direct.stdout}\n${direct.stderr}`).toBe(0);
+      expect(direct.stdout).toContain(realTest);
+
+      // Forge is configured to access the project through the symlink.
+      const config: ForgeConfig = {
+        version: '1.0.0',
+        roots: {
+          apps: {
+            app: {
+              path: 'packages/app',
+              sources: ['src'],
+              tests: ['tests'],
+            },
+          },
+        },
+        adapters: { ts: { type: 'typescript' } },
+        runners: { vitest: { type: 'vitest' } },
+        targets: {
+          apps: {
+            tests: {
+              root: 'apps.app',
+              adapter: ['ts'],
+              runner: ['vitest'],
+            },
+          },
+        },
+      };
+
+      const [target] = createValidationTargets(config, resolveTargetConfigs(config));
+
+      const discovered = await target.discoverTestFiles(repoRoot);
+
+      // Forge should preserve the configured repository-relative identity.
+      expect(discovered).toEqual([configuredTest]);
+
+      const result = await target.runner.run(discovered, repoRoot);
+
+      expect(result.exitCode).toBe(1);
+
+      const report: unknown = JSON.parse(await readFile(join(repoRoot, 'real/app/app-results.json'), 'utf8'));
+
+      expect(report).toMatchObject({
+        numTotalTestSuites: 1,
+        numTotalTests: 1,
+        numPassedTests: 0,
+        numFailedTests: 1,
+        testResults: [
+          expect.objectContaining({
+            name: expect.stringMatching(/[/\\]real[/\\]app[/\\]tests[/\\]App\.test\.ts$/),
+          }),
+        ],
+      });
+    } finally {
+      await rm(repoRoot, { recursive: true });
+    }
+  }, 30_000);
 });

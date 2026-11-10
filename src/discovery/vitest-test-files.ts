@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
+import { realpath } from 'node:fs/promises';
 
 function isWithinDirectory(directory: string, file: string): boolean {
   const path = relative(directory, file);
@@ -57,7 +58,7 @@ export function discoverVitestTestFiles(
       reject(new Error(`Failed to start Vitest discovery: ${error.message}`));
     });
 
-    child.on('close', (code) => {
+    child.on('close', async (code) => {
       if (code !== 0) {
         reject(new Error(`Vitest discovery failed with exit code ${code}: ${errorOutput.trim()}`));
         return;
@@ -66,16 +67,33 @@ export function discoverVitestTestFiles(
       try {
         const discoveredFiles = parseVitestFileList(output);
 
-        const allowedDirectories = testRoots.map((root) => resolve(projectDirectory, root));
+        const canonicalProjectDirectory = await realpath(projectDirectory);
 
-        const testFiles = discoveredFiles
-          .map((file) => resolve(projectDirectory, file))
-          .filter(
-            (file) =>
-              isWithinDirectory(projectDirectory, file) &&
-              allowedDirectories.some((directory) => isWithinDirectory(directory, file)),
-          )
-          .map((file) => relative(repoRoot, file).split(sep).join('/'));
+        const allowedDirectories = await Promise.all(
+          testRoots.map((root) => realpath(resolve(projectDirectory, root))),
+        );
+
+        const discoveredPaths = await Promise.all(
+          discoveredFiles.map(async (file) => {
+            const canonicalFile = await realpath(resolve(projectDirectory, file));
+
+            if (
+              !isWithinDirectory(canonicalProjectDirectory, canonicalFile) ||
+              !allowedDirectories.some((directory) => isWithinDirectory(directory, canonicalFile))
+            ) {
+              return null;
+            }
+
+            // Map the physical file back through Forge's configured project root.
+            const projectRelativePath = relative(canonicalProjectDirectory, canonicalFile);
+
+            const configuredPath = resolve(projectDirectory, projectRelativePath);
+
+            return relative(repoRoot, configuredPath).split(sep).join('/');
+          }),
+        );
+
+        const testFiles = discoveredPaths.filter((file): file is string => file !== null);
 
         resolveDiscovery([...new Set(testFiles)]);
       } catch (error) {
