@@ -66,7 +66,7 @@ FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions -t '#15'
 FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions -t '#16'
 ```
 
-All seven findings reproduce. None remain unverified. Assertions on discovery,
+All seven findings were independently reproduced against baseline commit 6aaef70. Issue #17 has since been corrected and promoted to normal CI. Issues #11-#16 remain quarantined. Assertions on discovery,
 selection, and routing fail for their corresponding defects, rather than a
 missing tool or an intentionally failing fixture assertion. For #17 the fixture
 tests themselves pass; the regression fails because Forge executes the wrong
