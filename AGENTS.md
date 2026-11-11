@@ -81,7 +81,7 @@ When reviewing a change, assess whether it preserves the following invariants:
    Identify changes that introduce disproportionate complexity, unclear ownership, or drift from Forge's intended responsibilities.
 
 8. **Execution integrity.**
-   A successful validation must have evidence that the intended tests were discovered, executed, and completed successfully within their configured target boundaries. Missing results, zero unintended test executions, incorrect runner scope, or unpropagated failures must never be represented as successful validation.
+   A successful validation must have evidence that the intended tests were discovered, executed, and completed successfully within their configured target boundaries. Missing results, no intended tests executed, incorrect runner scope, or unpropagated failures must never be represented as successful validation.
 
 Distinguish findings by significance:
 
@@ -92,6 +92,8 @@ Distinguish findings by significance:
 Avoid duplicating formatting and stylistic checks already enforced through CI.
 
 ## Review Output
+
+Scale review depth to the change's complexity, potential impact, and available evidence. Report material findings without unnecessary boilerplate.
 
 For each material finding, provide:
 
@@ -105,9 +107,9 @@ For each material finding, provide:
 
 ### Severity Definitions
 
-- **Critical:** Produces a falsely successful validation outcome or materially misleading evidence that could justify an unsafe decision
-- **High:** Silently excludes required validation, loses important execution evidence, or substantially compromises the reliability of a validation decision
-- **Medium:** Degrades selection accuracy, reproducibility, or operational reliability without necessarily producing a false success
+- **Critical:** Incorrect validation evidence causes Forge to report false success.
+- **High:** Required validation is missing or compromised, but false success has not necessarily been demonstrated.
+- **Medium:** Degrades selection accuracy, reproducibility, or operational reliability without necessarily producing a false success.
 - **Low:** Limited impact on explainability, efficiency, or usability without materially changing validation conclusions.
 
 Do not present speculation as fact. If evidence is unavailable, say what evidence would resolve the concern.
