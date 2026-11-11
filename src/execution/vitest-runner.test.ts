@@ -2,19 +2,24 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { createVitestRunner } from './vitest-runner.js';
 
+import { resolve } from 'node:path';
+
 describe('createVitestRunner', () => {
   it('executes only the selected test files', async () => {
     const execute = vi.fn(async () => 0);
-    const runner = createVitestRunner(execute);
+    const runner = createVitestRunner('.', execute);
 
     const result = await runner.run(['src/cli.test.ts', 'src/selection/select-tests.test.ts'], process.cwd());
 
     expect(execute).toHaveBeenCalledOnce();
 
     expect(execute).toHaveBeenCalledWith(
-      'npx',
-      ['--no-install', 'vitest', 'run', 'src/cli.test.ts', 'src/selection/select-tests.test.ts'],
+      process.execPath,
+      [expect.stringMatching(/vitest-worker\.(ts|js)$/)],
       process.cwd(),
+      JSON.stringify({
+        testFiles: ['src/cli.test.ts', 'src/selection/select-tests.test.ts'],
+      }),
     );
 
     expect(result).toEqual({ exitCode: 0 });
@@ -22,7 +27,7 @@ describe('createVitestRunner', () => {
 
   it('does not execute when no test files are provided', async () => {
     const execute = vi.fn(async () => 0);
-    const runner = createVitestRunner(execute);
+    const runner = createVitestRunner('.', execute);
 
     await expect(runner.run([], process.cwd())).rejects.toThrow('No test files provided');
 
@@ -31,11 +36,45 @@ describe('createVitestRunner', () => {
 
   it('returns a nonzero exit code when tests fail', async () => {
     const execute = vi.fn(async () => 1);
-    const runner = createVitestRunner(execute);
+    const runner = createVitestRunner('.', execute);
 
     const result = await runner.run(['src/cli.test.ts'], process.cwd());
 
     expect(execute).toHaveBeenCalledOnce();
     expect(result).toEqual({ exitCode: 1 });
+  });
+
+  it('translates repository-relative test paths for nested projects', async () => {
+    const execute = vi.fn(async () => 0);
+    const runner = createVitestRunner('packages/app', execute);
+    const repoRoot = process.cwd();
+
+    const result = await runner.run(['packages/app/tests/App.test.ts', 'packages/app/tests/Orders.test.ts'], repoRoot);
+
+    expect(execute).toHaveBeenCalledOnce();
+
+    expect(execute).toHaveBeenCalledWith(
+      process.execPath,
+      [expect.stringMatching(/vitest-worker\.(ts|js)$/)],
+      resolve(repoRoot, 'packages/app'),
+      JSON.stringify({
+        testFiles: ['tests/App.test.ts', 'tests/Orders.test.ts'],
+      }),
+    );
+
+    expect(result).toEqual({ exitCode: 0 });
+  });
+
+  it.each([
+    'root-tests/Unrelated.test.ts',
+    'packages/sibling/tests/Other.test.ts',
+    'packages/app/../sibling/tests/Other.test.ts',
+  ])('rejects test files outside the configured project: %s', async (testFile) => {
+    const execute = vi.fn(async () => 0);
+    const runner = createVitestRunner('packages/app', execute);
+
+    await expect(runner.run([testFile], process.cwd())).rejects.toThrow('Test file outside configured project');
+
+    expect(execute).not.toHaveBeenCalled();
   });
 });

@@ -1,33 +1,33 @@
-# Forge — Implementation Status & Next Steps
+# Forge
 
-**Updated:** November 7, 2026  
-**Repository:** [zerogravit1/forge](https://github.com/zerogravit1/forge)  
-**Working branch:** `fix/typescript-target-isolation`  
-**Target branch:** `develop`  
-**Pull request:** [#19](https://github.com/zerogravit1/forge/pull/19)  
-**Latest verified commit:** `8f701b0`
+**Evidence-driven test selection and orchestration.**
 
-## 1. Project objective
+Forge helps engineering teams determine which tests are relevant to a software change, execute those tests, and understand the evidence behind the resulting validation decision.
 
-Forge is an evidence-driven test selection and orchestration platform.
+Rather than running every test for every change—or relying on test selection that cannot explain its decisions—Forge aims to connect code changes, dependency relationships, test execution, and validation outcomes.
 
-Its purpose is to connect source-code changes with the tests required to validate those changes, while making validation decisions explainable.
+The objective is not simply to run fewer tests. It is to make software validation more efficient, explainable, and trustworthy.
 
-The current MVP focuses on:
+## How Forge works
 
-- Detecting changed files through Git.
-- Discovering available tests using configured project runners.
-- Mapping changes to potentially affected tests.
-- Planning and executing selected tests.
-- Identifying changes without known validation coverage.
-- Preserving correct validation boundaries across projects.
+Forge is being developed around five capabilities:
 
-**Core principle:** A successful validation result must mean that the intended tests actually executed successfully. Unrelated passing tests must not substitute for required validation.
+1. **Change detection:** Identify changed files through Git.
+2. **Test discovery:** Discover tests through supported frameworks and configured project boundaries.
+3. **Dependency analysis:** Map source changes to potentially affected tests.
+4. **Test execution:** Execute selected tests through their native runners while preserving test identities and failure semantics.
+5. **Validation evidence:** Identify what was selected, what executed, and where dependency information or validation coverage may be incomplete.
 
-## 2. Current implementation
+**Core principle:** Forge must not claim successful validation based on unrelated passing tests, incomplete dependency analysis, or missing execution evidence.
 
-Forge currently supports TypeScript/Vitest and Java/Maven validation targets.
+## Current development status
 
-The CLI provides `plan` and `run` commands. Target configuration identifies project roots, source directories, test directories, adapters, and runners.
+Forge is an early-stage open-source project focused on establishing a reliable TypeScript and Vitest workflow.
 
-Current work is concentrated on ensuring that TypeScript targets execute tests in the correct project and respect configured boundaries.
+The current implementation includes a CLI with `plan` and `run` commands, configurable validation targets, TypeScript dependency analysis, Vitest discovery, and selected-test execution.
+
+Java and Maven integrations also exist but have known limitations.
+
+Some TypeScript dependency patterns, including dynamic imports and project path aliases, are not yet handled correctly. These limitations are tracked in GitHub issues.
+
+Forge is not yet packaged for general installation. The current workflow is intended for repository development and validation while the TypeScript MVP is completed.
