@@ -75,7 +75,8 @@ export function discoverVitestTestFiles(
 
         const discoveredPaths = await Promise.all(
           discoveredFiles.map(async (file) => {
-            const canonicalFile = await realpath(resolve(projectDirectory, file));
+            const listedPath = resolve(projectDirectory, file);
+            const canonicalFile = await realpath(listedPath);
 
             if (
               !isWithinDirectory(canonicalProjectDirectory, canonicalFile) ||
@@ -85,7 +86,22 @@ export function discoverVitestTestFiles(
             }
 
             // Map the physical file back through Forge's configured project root.
-            const projectRelativePath = relative(canonicalProjectDirectory, canonicalFile);
+            // const projectRelativePath = relative(canonicalProjectDirectory, canonicalFile);
+
+            // const configuredPath = resolve(projectDirectory, projectRelativePath);
+
+            // Preserve the path identity reported by Vitest.
+            // A symlinked project root mat cause Vitest to report physical paths,
+            // while a symlinked test directory may retain its alias.
+            let projectRelativePath: string;
+
+            if (isWithinDirectory(projectDirectory, listedPath)) {
+              projectRelativePath = relative(projectDirectory, listedPath);
+            } else if (isWithinDirectory(canonicalProjectDirectory, listedPath)) {
+              projectRelativePath = relative(canonicalProjectDirectory, listedPath);
+            } else {
+              throw new Error(`Unsupported Vitest test path identity: ${file}`);
+            }
 
             const configuredPath = resolve(projectDirectory, projectRelativePath);
 

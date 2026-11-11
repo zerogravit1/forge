@@ -11,6 +11,10 @@ import { pathToFileURL } from 'node:url';
 import type { ForgeConfig } from '../config/forge-config.js';
 import { resolveTargetConfigs } from '../config/resolve-target-configs.js';
 import { createValidationTargets } from '../validation/create-validation-targets.js';
+import { createVitestRunner } from '../execution/vitest-runner.js';
+
+import { withTempRepository } from '../helpers/temp-repo.js';
+import { discoverVitestTestFiles } from '../discovery/vitest-test-files.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -501,5 +505,73 @@ describe('TypeScript target isolation regression', () => {
     } finally {
       await rm(repoRoot, { recursive: true });
     }
+  }, 30_000);
+
+  it('#17 preserves symlinked test-directory identity', async () => {
+    await withTempRepository('forge-symlinked-tests-', async (repo) => {
+      await repo.linkNodeModules();
+
+      await repo.write(
+        'packages/app/vitest.config.mjs',
+        `export default {
+          test: {
+            include: ['tests/**/*.test.ts'],
+            maxWorkers: 1,
+            reporters: ['json'],
+            outputFile: 'app-results.json'
+          }
+        };`,
+      );
+
+      await repo.write(
+        'packages/app/real-tests/Example.test.ts',
+        `import { test, expect } from 'vitest';
+         test('example', () => expect(true).toBe(false));`,
+      );
+
+      await symlink('real-tests', repo.path('packages/app/tests'), 'dir');
+
+      // Prove Vitest discovers the symlink alias.
+      const direct = spawnSync(
+        process.execPath,
+        [resolve('node_modules/vitest/vitest.mjs'), 'list', '--filesOnly', '--json'],
+        {
+          cwd: repo.path('packages/app'),
+          encoding: 'utf8',
+          timeout: 20_000,
+        },
+      );
+
+      expect(direct.error).toBeUndefined();
+      expect(direct.status, `${direct.stdout}\n${direct.stderr}`).toBe(0);
+
+      const listed = JSON.parse(direct.stdout) as Array<{ file: string }>;
+
+      expect(listed.map(({ file }) => file)).toContain(repo.path('packages/app/tests/Example.test.ts'));
+
+      // Forge must preserve the identity reported by Vitest.
+      const discovered = await discoverVitestTestFiles(repo.root, 'packages/app', ['tests']);
+
+      expect(discovered).toEqual(['packages/app/tests/Example.test.ts']);
+
+      const runner = createVitestRunner('packages/app');
+      const result = await runner.run(discovered, repo.root);
+
+      expect(result.exitCode).toBe(1);
+
+      const report: unknown = JSON.parse(await readFile(repo.path('packages/app/app-results.json'), 'utf8'));
+
+      expect(report).toMatchObject({
+        numTotalTestSuites: 1,
+        numTotalTests: 1,
+        numPassedTests: 0,
+        numFailedTests: 1,
+        testResults: [
+          expect.objectContaining({
+            status: 'failed',
+          }),
+        ],
+      });
+    });
   }, 30_000);
 });
