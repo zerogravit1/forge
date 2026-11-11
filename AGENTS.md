@@ -55,7 +55,7 @@ Challenge architectural and implementation decisions when there is a substantive
 
 Review changes for correctness, maintainability, usability, and alignment with Forge's North Star.
 
-Before approving a change, assess whether it preserves the following invariants:
+When reviewing a change, assess whether it preserves the following invariants:
 
 1. **No silent under-selection.**  
    A change must not exclude, skip, or reduce test selection without either:
@@ -80,6 +80,9 @@ Before approving a change, assess whether it preserves the following invariants:
 7. **Product relevance.**  
    Identify changes that introduce disproportionate complexity, unclear ownership, or drift from Forge's intended responsibilities.
 
+8. **Execution integrity.**
+   A successful validation must have evidence that the intended tests were discovered, executed, and completed successfully within their configured target boundaries. Missing results, zero unintended test executions, incorrect runner scope, or unpropagated failures must never be represented as successful validation.
+
 Distinguish findings by significance:
 
 - **Defect:** Demonstrable correctness, security, or reliability issue.
@@ -92,12 +95,20 @@ Avoid duplicating formatting and stylistic checks already enforced through CI.
 
 For each material finding, provide:
 
-- **Severity:** Defect, Risk, or Recommendation.
+- **Finding Type:** Defect, Risk, or Recommendation.
+- **Severity:** Critical, High, Medium, or Low, based on the potential impact to validation correctness, evidence integrity, reproducibility, or the reliability of downstream decisions.
 - **Location:** File and relevant code or behavior.
-- **Concern:** What could go wrong or why the change may not meet Forge's goals.
+- **Concern:** Describe the failure mechanism, affected validation behavior, and potential consequences.
 - **Evidence:** Concrete example, failing scenario, dependency path, or missing validation.
 - **Suggested action:** A specific, proportionate next step.
-- **Confidence:** High, medium, or low, especially when the concern depends on incomplete information.
+- **Confidence:** High, medium, or low, based on available evidence and verification.
+
+### Severity Definitions
+
+- **Critical:** Produces a falsely successful validation outcome or materially misleading evidence that could justify an unsafe decision
+- **High:** Silently excludes required validation, loses important execution evidence, or substantially compromises the reliability of a validation decision
+- **Medium:** Degrades selection accuracy, reproducibility, or operational reliability without necessarily producing a false success
+- **Low:** Limited impact on explainability, efficiency, or usability without materially changing validation conclusions.
 
 Do not present speculation as fact. If evidence is unavailable, say what evidence would resolve the concern.
 
