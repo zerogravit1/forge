@@ -123,6 +123,12 @@ async function main(): Promise<void> {
     if (failed) {
       process.exitCode = process.exitCode || 1;
     }
+  } catch (error: unknown) {
+    // Preserve execution failures before Vitest can terminate
+    // the process during bounded shutdown.
+    process.exitCode = 1;
+
+    console.error(error instanceof Error ? (error.stack ?? error.message) : String(error));
   } finally {
     await vitest.exit();
   }

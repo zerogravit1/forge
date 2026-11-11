@@ -6,6 +6,8 @@ import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
+import { withTempRepository } from '../helpers/temp-repo.js';
+
 describe('Vitest worker integration', () => {
   it('returns a nonzero exit code for malformed JSON manifests', () => {
     const workerPath = fileURLToPath(new URL('./vitest-worker.ts', import.meta.url));
@@ -165,4 +167,84 @@ describe('Vitest worker integration', () => {
       await rm(projectRoot, { recursive: true });
     }
   }, 20_000);
+
+  it('preserves execution errors during timed shutdown', async () => {
+    await withTempRepository('forge-reporter-shutdown-', async (repo) => {
+      await repo.linkNodeModules();
+
+      await repo.write(
+        'vitest.config.mjs',
+        `export default {
+          test: {
+            include: ['tests/**/*.test.ts'],
+            maxWorkers: 1,
+            globalSetup: ['./global-setup.mjs'],
+            teardownTimeout: 300,
+            reporters: ['default', './failing-reporter.mjs']
+          }
+        };`,
+      );
+
+      await repo.write(
+        'global-setup.mjs',
+        `export default function setup() {
+          return async () => {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          };
+        }`,
+      );
+
+      await repo.write(
+        'failing-reporter.mjs',
+        `export default class FailingReporter {
+          onTestRunEnd() {
+            throw new Error('FORGE_REPORTER_FAILURE');
+          }
+        }`,
+      );
+
+      await repo.write(
+        'tests/App.test.ts',
+        `import { test, expect } from 'vitest';
+         test('passes', () => expect(true).toBe(true));`,
+      );
+
+      // Establish upstream behavior.
+      const direct = spawnSync(
+        process.execPath,
+        [resolve('node_modules/vitest/vitest.mjs'), 'run', 'tests/App.test.ts'],
+        {
+          cwd: repo.root,
+          encoding: 'utf8',
+          timeout: 10_000,
+          killSignal: 'SIGKILL',
+        },
+      );
+
+      const directOutput = `${direct.stdout}\n${direct.stderr}`;
+
+      expect(direct.error).toBeUndefined();
+      expect(direct.status, directOutput).toBe(1);
+      expect(directOutput).toContain('FORGE_REPORTER_FAILURE');
+
+      // Forge must not lose the reporter failure during shutdown.
+      const workerPath = fileURLToPath(new URL('./vitest-worker.ts', import.meta.url));
+
+      const worker = spawnSync(process.execPath, [workerPath], {
+        cwd: repo.root,
+        input: JSON.stringify({
+          testFiles: ['tests/App.test.ts'],
+        }),
+        encoding: 'utf8',
+        timeout: 10_000,
+        killSignal: 'SIGKILL',
+      });
+
+      const workerOutput = `${worker.stdout}\n${worker.stderr}`;
+
+      expect(worker.error).toBeUndefined();
+      expect(worker.status, workerOutput).toBe(1);
+      expect(workerOutput).toContain('FORGE_REPORTER_FAILURE');
+    });
+  }, 30_000);
 });
