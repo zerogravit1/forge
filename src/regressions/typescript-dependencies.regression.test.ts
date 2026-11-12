@@ -88,4 +88,34 @@ it('expects the original value', () => expect(value).toBe(1));`,
     const unrelated = await planTestSelection([{ status: 'modified', path: 'src/other.ts' }], testFiles, repoRoot);
     expect.soft(unrelated.selectedTests).toEqual(['src/unrelated.test.ts']);
   });
+
+  it('#13 conservatively selects tests with nonliteral dynamic imports', async () => {
+    await writeFile(
+      join(repoRoot, 'src/runtime.test.ts'),
+      `
+      function getModuleName(): string {
+        return process.env.MODULE_path ?? './value.js';
+      }
+      
+      export async function load() {
+        const moduleName = getModuleName();
+        return import(moduleName);
+      }
+      `,
+    );
+
+    const testFiles = ['src/static.test.ts', 'src/runtime.test.ts', 'src/unrelated.test.ts'];
+
+    const affected = await planTestSelection([{ status: 'modified', path: 'src/value' }], testFiles, repoRoot);
+
+    expect([...affected.selectedTests].sort()).toEqual(['src/runtime.test.ts', 'src/static.test.ts']);
+
+    expect(affected.unmappedChanges).toEqual([]);
+
+    const unrelated = await planTestSelection([{ status: 'modified', path: 'src/other.ts' }], testFiles, repoRoot);
+
+    expect([...unrelated.selectedTests].sort()).toEqual(['src/runtime.test.ts', 'src/unrelated.test.ts']);
+
+    expect(unrelated.unmappedChanges).toEqual([]);
+  });
 });

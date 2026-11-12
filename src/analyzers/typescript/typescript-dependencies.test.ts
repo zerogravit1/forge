@@ -10,6 +10,7 @@ import {
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { withTempRepository } from '../../helpers/temp-repo.js';
 
 describe('discoverImports', () => {
   it('returns the imports declared in a source file', () => {
@@ -38,6 +39,19 @@ describe('discoverImports', () => {
     `;
 
     expect(discoverImports(source)).toEqual(['./order-service.js', './order-validator.js']);
+  });
+
+  it('discovers literal dynamic imports inside functions', () => {
+    const source = `
+      import { helper } from './helper.js';
+
+      async function loadValue() {
+        const { value } = await import('./value.js');
+        return value;
+      }
+    `;
+
+    expect(discoverImports(source)).toEqual(['./helper.js', './value.js']);
   });
 });
 
@@ -88,6 +102,29 @@ describe('discoverModuleImports', () => {
     } finally {
       await rm(repoRoot, { recursive: true, force: true });
     }
+  });
+
+  it('reports nonliteral dynamic imports as unresolved dependencies', async () => {
+    await withTempRepository('forge-dynamic-unresolved-', async (repo) => {
+      await repo.write(
+        'src/consumer.test.ts',
+        `
+        const moduleName = './value.js';
+
+        export async function load() {
+          return import(moduleName);
+        }
+        `,
+      );
+
+      const result = await discoverModuleImports('src/consumer.test.ts', repo.root);
+
+      expect(result).toEqual({
+        file: 'src/consumer.test.ts',
+        dependencies: [],
+        unresolvedDependencies: ['import(moduleName)'],
+      });
+    });
   });
 });
 
