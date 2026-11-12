@@ -126,6 +126,23 @@ describe('discoverModuleImports', () => {
       });
     });
   });
+
+  it('reports computed template imports as unresolved dependencies', async () => {
+    await withTempRepository('forge-dynamic-template-', async (repo) => {
+      await repo.write(
+        'src/consumer.test.ts',
+        ['export async function load(name: string) {', '  return import(`./modules/${name}.js`);', '}'].join('\n'),
+      );
+
+      const result = await discoverModuleImports('src/consumer.test.ts', repo.root);
+
+      expect(result).toEqual({
+        file: 'src/consumer.test.ts',
+        dependencies: [],
+        unresolvedDependencies: ['import(`./modules/${name}.js`)'],
+      });
+    });
+  });
 });
 
 describe('discoverRepositoryModules', () => {
