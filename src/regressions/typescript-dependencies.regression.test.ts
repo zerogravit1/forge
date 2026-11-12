@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile, symlink, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import ts from 'typescript';
 
 import { planTestSelection } from '../selection/plan-test-selection.js';
+import { createVitestRunner } from '../execution/vitest-runner.js';
 
 describe('TypeScript regression baseline', () => {
   let repoRoot: string;
@@ -51,6 +52,43 @@ it('expects the original value', async () => {
 
     const unrelated = await planTestSelection([{ status: 'modified', path: 'src/other.ts' }], testFiles, repoRoot);
     expect.soft(unrelated.selectedTests).toEqual(['src/unrelated.test.ts']);
+
+    await symlink(resolve('node_modules'), join(repoRoot, 'node_modules'), 'dir');
+
+    await writeFile(
+      join(repoRoot, 'vitest.config.mjs'),
+      `export default {
+        test: {
+          include: ['src/**/*.test.ts'],
+          maxWorkers: 1,
+          reporters: ['json'],
+          outputFile: 'results.json'
+        },
+      };`,
+    );
+
+    const runner = createVitestRunner();
+    const result = await runner.run(affected.selectedTests, repoRoot);
+
+    expect(result.exitCode).toBe(1);
+
+    const report = JSON.parse(await readFile(join(repoRoot, 'results.json'), 'utf8')) as {
+      numTotalTests: number;
+      numPassesTests: number;
+      numFailedTests: number;
+      testResults: Array<{ name: string }>;
+    };
+
+    expect(report).toMatchObject({
+      numTotalTests: 2,
+      numPassedTests: 1,
+      numFailedTests: 1,
+    });
+
+    expect(report.testResults.map(({ name }) => relative(repoRoot, name).replaceAll('\\', '/')).sort()).toEqual([
+      'src/dynamic.test.ts',
+      'src/static.test.ts',
+    ]);
   });
 
   it.skipIf(process.env.FORGE_REGRESSION_BASELINE !== '1')(
@@ -113,17 +151,14 @@ it('expects the original value', () => expect(value).toBe(1));`,
     );
 
     const testFiles = ['src/static.test.ts', 'src/runtime.test.ts', 'src/unrelated.test.ts'];
-
     const affected = await planTestSelection([{ status: 'modified', path: 'src/value.ts' }], testFiles, repoRoot);
 
     expect([...affected.selectedTests].sort()).toEqual(['src/runtime.test.ts', 'src/static.test.ts']);
-
     expect(affected.unmappedChanges).toEqual([]);
 
     const unrelated = await planTestSelection([{ status: 'modified', path: 'src/other.ts' }], testFiles, repoRoot);
 
     expect([...unrelated.selectedTests].sort()).toEqual(['src/runtime.test.ts', 'src/unrelated.test.ts']);
-
     expect(unrelated.unmappedChanges).toEqual([]);
   });
 });
