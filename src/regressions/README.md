@@ -13,13 +13,13 @@ Use the Node version in `.nvmrc` and install the locked dependencies with `npm c
 From the repository root:
 
 ```bash
-# Opt in to the six remaining quarantined regressions; #17 also runs. Expected baseline result: six failures.
+# Opt in to the five remaining quarantined regressions; #13 and #17 also runs. Expected baseline result: five failures.
 FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions
 
-# Select a single issue, for example #13.
-FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions -t '#13'
+# Select a single issue, for example #12.
+FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions -t '#12'
 
-# Normal passing CI workflow; the six new tests are skipped.
+# Normal passing CI workflow; the five new tests are skipped.
 npm run check
 ```
 

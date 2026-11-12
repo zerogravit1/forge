@@ -33,7 +33,7 @@ it('reads another module', () => expect(other).toBe(1));`,
     await rm(repoRoot, { recursive: true, force: true });
   });
 
-  it('#13 selects a dynamic-import consumer without selecting unrelated tests', async () => {
+  it('#13 selects and executes literal dynamic-import consumers', async () => {
     await writeFile(
       join(repoRoot, 'src/dynamic.test.ts'),
       `import { it, expect } from 'vitest';
@@ -74,7 +74,7 @@ it('expects the original value', async () => {
 
     const report = JSON.parse(await readFile(join(repoRoot, 'results.json'), 'utf8')) as {
       numTotalTests: number;
-      numPassesTests: number;
+      numPassedTests: number;
       numFailedTests: number;
       testResults: Array<{ name: string }>;
     };
@@ -140,7 +140,7 @@ it('expects the original value', () => expect(value).toBe(1));`,
       join(repoRoot, 'src/runtime.test.ts'),
       `
       function getModuleName(): string {
-        return process.env.MODULE_path ?? './value.js';
+        return process.env.MODULE_PATH ?? './value.js';
       }
       
       export async function load() {
