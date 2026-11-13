@@ -13,13 +13,13 @@ Use the Node version in `.nvmrc` and install the locked dependencies with `npm c
 From the repository root:
 
 ```bash
-# Opt in to the six remaining quarantined regressions; #17 also runs. Expected baseline result: six failures.
+# Opt in to the five remaining quarantined regressions; #13 and #17 also runs. Expected baseline result: five failures.
 FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions
 
-# Select a single issue, for example #13.
-FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions -t '#13'
+# Select a single issue, for example #12.
+FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions -t '#12'
 
-# Normal passing CI workflow; the six new tests are skipped.
+# Normal passing CI workflow; the five new tests are skipped.
 npm run check
 ```
 
@@ -60,7 +60,6 @@ Each row has its own reproduction command; the issue number is the test filter:
 ```bash
 FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions -t '#11'
 FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions -t '#12'
-FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions -t '#13'
 FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions -t '#14'
 FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions -t '#15'
 FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions -t '#16'
@@ -103,10 +102,11 @@ expectations to match the current omissions or substitute unrelated tests.
 
 ## Remediation status
 
-| Issue   | Status                                                                   |
-| ------- | ------------------------------------------------------------------------ |
-| #11–#16 | Open; regression tests quarantined                                       |
-| #17     | Fixed on `fix/typescript-target-isolation`; regression runs in normal CI |
+| Issue             | Status                                                                   |
+| ----------------- | ------------------------------------------------------------------------ |
+| #11, #12, #14–#16 | Open; regression tests quarantined                                       |
+| #13               | Fixed on `fix/typescript-dynamic-imports`; regression runs in normal CI  |
+| #17               | Fixed on `fix/typescript-target-isolation`; regression runs in normal CI |
 
 ### Issue #17
 
@@ -116,3 +116,18 @@ expectations to match the current omissions or substitute unrelated tests.
   to project-relative paths.
 - Tests outside the configured project are rejected.
 - Failing package tests propagate a nonzero Forge exit status.
+
+### Issue #13
+
+- TypeScript dependency discovery recognizes literal dynamic `import()` expressions,
+  including imports nested inside functions and test callbacks.
+- Literal dynamic imports resolve to source modules and contribute dependency
+  edges to the test-selection graph.
+- Nonliteral dynamic imports, including variables and computed template literals,
+  are recorded as unresolved dependencies.
+- Unresolved dependencies propagate through the dependency graph and trigger
+  conservative test selection rather than silently excluding potentially affected tests.
+- Static and dynamic consumers of changed modules are selected without
+  unnecessarily including unrelated tests.
+- Regression coverage verifies actual Vitest execution, selected test identities,
+  test counts, and propagation of failing assertions to a nonzero exit status.

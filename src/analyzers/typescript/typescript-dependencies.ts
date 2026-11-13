@@ -4,37 +4,65 @@ import { isAbsolute, relative, resolve, sep } from 'node:path';
 
 import type { ModuleDependency } from '../../models/module-dependency.js';
 
-export function discoverImports(source: string): string[] {
-  const parsed = ts.createSourceFile('example.ts', source, ts.ScriptTarget.Latest, true);
+interface ImportAnalysis {
+  imports: string[];
+  unresolvedDynamicImports: string[];
+}
 
-  const statements = parsed.statements;
+function analyzeImports(source: string, fileName = 'examples.ts'): ImportAnalysis {
+  const parsed = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true);
 
-  const imports = statements.filter(ts.isImportDeclaration);
-  const exports = statements.filter(ts.isExportDeclaration);
-
-  const dependencies = imports
+  const imports = parsed.statements
+    .filter(ts.isImportDeclaration)
     .map((statement) => statement.moduleSpecifier)
     .filter(ts.isStringLiteral)
     .map((specifier) => specifier.text);
 
-  const exportDependencies = exports
+  const exports = parsed.statements
+    .filter(ts.isExportDeclaration)
     .map((statement) => statement.moduleSpecifier)
     .filter((specifier) => specifier !== undefined)
     .filter(ts.isStringLiteral)
     .map((specifier) => specifier.text);
 
-  return [...dependencies, ...exportDependencies];
+  const dynamicImports: string[] = [];
+  const unresolvedDynamicImports: string[] = [];
+
+  function visit(node: ts.Node): void {
+    if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+      const [specifier] = node.arguments;
+
+      if (specifier && (ts.isStringLiteral(specifier) || ts.isNoSubstitutionTemplateLiteral(specifier))) {
+        dynamicImports.push(specifier.text);
+      } else {
+        unresolvedDynamicImports.push(`import(${specifier?.getText(parsed) ?? ''})`);
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(parsed);
+
+  return {
+    imports: [...imports, ...exports, ...dynamicImports],
+    unresolvedDynamicImports,
+  };
+}
+
+export function discoverImports(source: string): string[] {
+  return analyzeImports(source).imports;
 }
 
 export async function discoverModuleImports(file: string, repoRoot: string): Promise<ModuleDependency> {
   const absolutePath = resolve(repoRoot, file);
   const source = await readFile(absolutePath, 'utf8');
 
-  const importStatements = discoverImports(source);
+  const { imports: importStatements, unresolvedDynamicImports } = analyzeImports(source, absolutePath);
 
   const resolvedImportPaths: string[] = [];
 
-  const unresolvedDependencies: string[] = [];
+  const unresolvedDependencies: string[] = [...unresolvedDynamicImports];
 
   for (const statement of importStatements) {
     const resolvedPath = resolveImportPath(absolutePath, statement);
