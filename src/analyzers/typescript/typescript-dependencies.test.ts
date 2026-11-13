@@ -68,6 +68,98 @@ describe('resolveImportPath', () => {
 
     expect(result).toBeUndefined();
   });
+
+  it('resolves path aliases using the project tsconfig', async () => {
+    await withTempRepository('forge-tsconfig-alias-', async (repo) => {
+      await repo.write(
+        'tsconfig.json',
+        JSON.stringify({
+          compilerOptions: {
+            module: 'NodeNext',
+            moduleResolution: 'NodeNext',
+            paths: {
+              '@app/*': ['./src/*'],
+            },
+          },
+        }),
+      );
+
+      await repo.write('src/value.ts', 'export const value = 2;');
+
+      await repo.write('src/alias.test.ts', "import { value } from '@app/value.js';");
+
+      const result = resolveImportPath(repo.path('src/alias.test.ts'), '@app/value.js');
+
+      expect(result).toBe(repo.path('src/value.ts'));
+    });
+  });
+
+  it('uses the nearest child tsconfig for each source file', async () => {
+    await withTempRepository('forge-tsconfig-children-', async (repo) => {
+      await repo.write(
+        'tsconfig.base.json',
+        JSON.stringify({
+          compilerOptions: {
+            module: 'NodeNext',
+            moduleResolution: 'NodeNext',
+          },
+        }),
+      );
+
+      for (const project of ['server', 'web']) {
+        await repo.write(
+          `apps/${project}/tsconfig.json`,
+          JSON.stringify({
+            extends: '../../tsconfig.base.json',
+            compilerOptions: {
+              paths: {
+                '@app/*': ['./src/*'],
+              },
+            },
+          }),
+        );
+
+        await repo.write(`apps/${project}/src/value.ts`, `export const value = '${project}';`);
+        await repo.write(`apps/${project}/src/consumer.test.ts`, "import { value } from '@app/value.js';");
+
+        const result = resolveImportPath(repo.path(`apps/${project}/src/consumer.test.ts`), '@app/value.js');
+
+        expect(result).toBe(repo.path(`apps/${project}/src/value.ts`));
+      }
+    });
+  });
+
+  it('resolves inherited path aliases relative to the base tsconfig', async () => {
+    await withTempRepository('forge-tsconfig-inherited-', async (repo) => {
+      await repo.write(
+        'tsconfig.base.json',
+        JSON.stringify({
+          compilerOptions: {
+            module: 'NodeNext',
+            moduleResolution: 'NodeNext',
+            paths: {
+              '@shared/*': ['./shared/*'],
+            },
+          },
+        }),
+      );
+
+      await repo.write(
+        'apps/server/tsconfig.json',
+        JSON.stringify({
+          extends: '../../tsconfig.base.json',
+        }),
+      );
+
+      await repo.write('shared/value.ts', 'export const value = 2;');
+
+      await repo.write('apps/server/src/consumer.test.ts', "import { value } from '@shared/value.js';");
+
+      const result = resolveImportPath(repo.path('apps/server/src/consumer.test.ts'), '@shared/value.js');
+
+      expect(result).toBe(repo.path('shared/value.ts'));
+    });
+  });
 });
 
 describe('discoverModuleImports', () => {
@@ -162,6 +254,36 @@ describe('discoverModuleImports', () => {
       expect(result).toEqual({
         file: 'src/consumer.test.tsx',
         dependencies: ['src/value.ts'],
+      });
+    });
+  });
+
+  it('reports unresolved path aliases without flagging external packages', async () => {
+    await withTempRepository('forge-tsconfig-unresolved-', async (repo) => {
+      await repo.write(
+        'tsconfig.json',
+        JSON.stringify({
+          compilerOptions: {
+            module: 'NodeNext',
+            moduleResolution: 'NodeNext',
+            paths: {
+              '@app/*': ['./src/*'],
+            },
+          },
+        }),
+      );
+
+      await repo.write(
+        'src/consumer.test.ts',
+        ["import { missing } from '@app.missing.js';", "import { external } from 'external-packages';"].join('\n'),
+      );
+
+      const result = await discoverModuleImports('src/consumer.test.ts', repo.root);
+
+      expect(result).toEqual({
+        file: 'src/consumer.test.ts',
+        dependencies: [],
+        unresolvedDependencies: ['@app/missing.js'],
       });
     });
   });

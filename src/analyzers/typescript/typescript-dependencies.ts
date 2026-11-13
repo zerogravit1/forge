@@ -1,6 +1,6 @@
 import ts from 'typescript';
 import { readFile } from 'fs/promises';
-import { isAbsolute, relative, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 
 import type { ModuleDependency } from '../../models/module-dependency.js';
 
@@ -50,6 +50,57 @@ function analyzeImports(source: string, fileName = 'examples.ts'): ImportAnalysi
   };
 }
 
+function loadCompilerOptions(importingFile: string): ts.CompilerOptions {
+  const absoluteFile = resolve(importingFile);
+
+  const configPath = ts.findConfigFile(dirname(absoluteFile), ts.sys.fileExists, 'tsconfig.json');
+
+  let compilerOptions: ts.CompilerOptions = {
+    module: ts.ModuleKind.NodeNext,
+    moduleResolution: ts.ModuleResolutionKind.NodeNext,
+    target: ts.ScriptTarget.ES2022,
+  };
+
+  if (configPath) {
+    const config = ts.readConfigFile(configPath, ts.sys.readFile);
+
+    if (config.error) {
+      throw new Error(ts.flattenDiagnosticMessageText(config.error.messageText, '\n'));
+    }
+
+    const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, dirname(configPath), undefined, configPath);
+
+    if (parsed.errors.length > 0) {
+      throw new Error(
+        parsed.errors.map((error) => ts.flattenDiagnosticMessageText(error.messageText, '\n')).join('\n'),
+      );
+    }
+
+    compilerOptions = parsed.options;
+  }
+
+  return compilerOptions;
+}
+
+function matchesPathAlias(importSpecifier: string, compilerOptions: ts.CompilerOptions): boolean {
+  return Object.keys(compilerOptions.paths ?? {}).some((pattern) => {
+    const wildcard = pattern.indexOf('*');
+
+    if (wildcard === -1) {
+      return importSpecifier === pattern;
+    }
+
+    const prefix = pattern.slice(0, wildcard);
+    const suffix = pattern.slice(wildcard + 1);
+
+    return (
+      importSpecifier.startsWith(prefix) &&
+      importSpecifier.endsWith(suffix) &&
+      importSpecifier.length >= prefix.length + suffix.length
+    );
+  });
+}
+
 export function discoverImports(source: string): string[] {
   return analyzeImports(source).imports;
 }
@@ -64,11 +115,15 @@ export async function discoverModuleImports(file: string, repoRoot: string): Pro
 
   const unresolvedDependencies: string[] = [...unresolvedDynamicImports];
 
+  const compilerOptions = loadCompilerOptions(absolutePath);
+
   for (const statement of importStatements) {
-    const resolvedPath = resolveImportPath(absolutePath, statement);
+    const resolvedPath = resolveImportPath(absolutePath, statement, compilerOptions);
 
     if (!resolvedPath) {
-      if (statement.startsWith('./') || statement.startsWith('../')) {
+      const isRelative = statement.startsWith('./') || statement.startsWith('../');
+
+      if (isRelative || matchesPathAlias(statement, compilerOptions)) {
         unresolvedDependencies.push(statement);
       }
 
@@ -126,14 +181,40 @@ export async function discoverRepositoryModules(testFiles: string[], repoRoot: s
   return modules;
 }
 
-export function resolveImportPath(importingFile: string, importSpecifier: string): string | undefined {
-  const compilerOptions: ts.CompilerOptions = {
-    module: ts.ModuleKind.NodeNext,
-    moduleResolution: ts.ModuleResolutionKind.NodeNext,
-    target: ts.ScriptTarget.ES2022,
-  };
+export function resolveImportPath(
+  importingFile: string,
+  importSpecifier: string,
+  compilerOptions = loadCompilerOptions(importingFile),
+): string | undefined {
+  // const absoluteFile = resolve(importingFile);
 
-  const result = ts.resolveModuleName(importSpecifier, importingFile, compilerOptions, ts.sys);
+  // const configPath = ts.findConfigFile(dirname(absoluteFile), ts.sys.fileExists, 'tsconfig.json');
+
+  // let compilerOptions: ts.CompilerOptions = {
+  //   module: ts.ModuleKind.NodeNext,
+  //   moduleResolution: ts.ModuleResolutionKind.NodeNext,
+  //   target: ts.ScriptTarget.ES2022,
+  // };
+
+  // if (configPath) {
+  //   const config = ts.readConfigFile(configPath, ts.sys.readFile);
+
+  //   if (config.error) {
+  //     throw new Error(ts.flattenDiagnosticMessageText(config.error.messageText, '\n'));
+  //   }
+
+  //   const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, dirname(configPath), undefined, configPath);
+
+  //   if (parsed.errors.length > 0) {
+  //     throw new Error(
+  //       parsed.errors.map((error) => ts.flattenDiagnosticMessageText(error.messageText, '\n')).join('\n'),
+  //     );
+  //   }
+
+  //   compilerOptions = parsed.options;
+  // }
+
+  const result = ts.resolveModuleName(importSpecifier, resolve(importingFile), compilerOptions, ts.sys);
 
   return result.resolvedModule?.resolvedFileName;
 }
