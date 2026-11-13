@@ -9,8 +9,8 @@ interface ImportAnalysis {
   unresolvedDynamicImports: string[];
 }
 
-function analyzeImports(source: string): ImportAnalysis {
-  const parsed = ts.createSourceFile('example.ts', source, ts.ScriptTarget.Latest, true);
+function analyzeImports(source: string, fileName = 'examples.ts'): ImportAnalysis {
+  const parsed = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true);
 
   const imports = parsed.statements
     .filter(ts.isImportDeclaration)
@@ -58,7 +58,7 @@ export async function discoverModuleImports(file: string, repoRoot: string): Pro
   const absolutePath = resolve(repoRoot, file);
   const source = await readFile(absolutePath, 'utf8');
 
-  const { imports: importStatements, unresolvedDynamicImports } = analyzeImports(source);
+  const { imports: importStatements, unresolvedDynamicImports } = analyzeImports(source, absolutePath);
 
   const resolvedImportPaths: string[] = [];
 

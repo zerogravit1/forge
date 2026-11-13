@@ -143,6 +143,28 @@ describe('discoverModuleImports', () => {
       });
     });
   });
+
+  it('discovers dynamic imports nested in TSX expressions', async () => {
+    await withTempRepository('forge-tsx-dynamic-', async (repo) => {
+      await repo.write('src/value.ts', 'export const value = 2;');
+
+      await repo.write(
+        'src/consumer.test.tsx',
+        `
+        export function load() {
+          return <div>{import('./value.js')}</div>;
+        }
+        `,
+      );
+
+      const result = await discoverModuleImports('src/consumer.test.tsx', repo.root);
+
+      expect(result).toEqual({
+        file: 'src/consumer.test.tsx',
+        dependencies: ['src/value.ts'],
+      });
+    });
+  });
 });
 
 describe('discoverRepositoryModules', () => {

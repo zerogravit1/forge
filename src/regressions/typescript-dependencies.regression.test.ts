@@ -7,6 +7,21 @@ import ts from 'typescript';
 import { planTestSelection } from '../selection/plan-test-selection.js';
 import { createVitestRunner } from '../execution/vitest-runner.js';
 
+type VitestReport = {
+  numTotalTests: number;
+  numPassedTests: number;
+  numFailedTests: number;
+  testResults: Array<{
+    name: string;
+    status?: string;
+    message?: string;
+    assertionResults: Array<{
+      status: string;
+      failureMessages: string[];
+    }>;
+  }>;
+};
+
 describe('TypeScript regression baseline', () => {
   let repoRoot: string;
 
@@ -72,12 +87,7 @@ it('expects the original value', async () => {
 
     expect(result.exitCode).toBe(1);
 
-    const report = JSON.parse(await readFile(join(repoRoot, 'results.json'), 'utf8')) as {
-      numTotalTests: number;
-      numPassedTests: number;
-      numFailedTests: number;
-      testResults: Array<{ name: string }>;
-    };
+    const report = JSON.parse(await readFile(join(repoRoot, 'results.json'), 'utf8')) as VitestReport;
 
     expect(report).toMatchObject({
       numTotalTests: 2,
@@ -160,5 +170,78 @@ it('expects the original value', () => expect(value).toBe(1));`,
 
     expect([...unrelated.selectedTests].sort()).toEqual(['src/runtime.test.ts', 'src/unrelated.test.ts']);
     expect(unrelated.unmappedChanges).toEqual([]);
+  });
+
+  it('#13 selects and executes JSX-nested dynamic imports', async () => {
+    await writeFile(
+      join(repoRoot, 'src/dynamic-tsx.test.tsx'),
+      `/** @jsxRuntime classic */
+      /** @jsx h */
+      import { it, expect} from 'vitest';
+
+      // Minimal JSX factory so React isn't required.
+      function h(_tag: string, _props: unknown, child: unknown) {
+        return child;
+      }
+
+      it('detects a changed value through a JSX-nested import', async () => {
+        const module = await (
+          <div>{import('./value.js')}</div> as unknown as
+            Promise<{ value: number }>
+        );
+
+        expect(module.value).toBe(1);
+      });`,
+    );
+
+    const testFiles = ['src/static.test.ts', 'src/dynamic-tsx.test.tsx', 'src/unrelated.test.ts'];
+
+    const affected = await planTestSelection([{ status: 'modified', path: 'src/value.ts' }], testFiles, repoRoot);
+
+    expect([...affected.selectedTests].sort()).toEqual(['src/dynamic-tsx.test.tsx', 'src/static.test.ts']);
+
+    expect(affected.unmappedChanges).toEqual([]);
+    expect(affected.selectedTests).not.toContain('src/unrelated.test.ts');
+
+    await symlink(resolve('node_modules'), join(repoRoot, 'node_modules'), 'dir');
+
+    await writeFile(
+      join(repoRoot, 'vitest.config.mjs'),
+      `export default {
+        test: {
+          include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+          maxWorkers: 1,
+          reporters: ['json'],
+          outputFile: 'results.json'
+        }
+      };`,
+    );
+
+    const runner = createVitestRunner();
+    const result = await runner.run(affected.selectedTests, repoRoot);
+
+    expect(result.exitCode).toBe(1);
+
+    const report = JSON.parse(await readFile(join(repoRoot, 'results.json'), 'utf8')) as VitestReport;
+
+    expect(report).toMatchObject({
+      numTotalTests: 2,
+      numPassedTests: 1,
+      numFailedTests: 1,
+    });
+
+    expect(report.testResults.map(({ name }) => relative(repoRoot, name).replaceAll('\\', '/')).sort()).toEqual([
+      'src/dynamic-tsx.test.tsx',
+      'src/static.test.ts',
+    ]);
+
+    const tsxResult = report.testResults.find(({ name }) => name.endsWith('dynamic-tsx.test.tsx'));
+
+    expect(tsxResult?.assertionResults).toEqual([
+      expect.objectContaining({
+        status: 'failed',
+        failureMessages: expect.arrayContaining([expect.stringContaining('expected 2 to be 1')]),
+      }),
+    ]);
   });
 });
