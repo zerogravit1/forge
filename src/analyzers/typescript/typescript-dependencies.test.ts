@@ -275,7 +275,7 @@ describe('discoverModuleImports', () => {
 
       await repo.write(
         'src/consumer.test.ts',
-        ["import { missing } from '@app.missing.js';", "import { external } from 'external-packages';"].join('\n'),
+        ["import { missing } from '@app/missing.js';", "import { external } from 'external-packages';"].join('\n'),
       );
 
       const result = await discoverModuleImports('src/consumer.test.ts', repo.root);

@@ -186,34 +186,6 @@ export function resolveImportPath(
   importSpecifier: string,
   compilerOptions = loadCompilerOptions(importingFile),
 ): string | undefined {
-  // const absoluteFile = resolve(importingFile);
-
-  // const configPath = ts.findConfigFile(dirname(absoluteFile), ts.sys.fileExists, 'tsconfig.json');
-
-  // let compilerOptions: ts.CompilerOptions = {
-  //   module: ts.ModuleKind.NodeNext,
-  //   moduleResolution: ts.ModuleResolutionKind.NodeNext,
-  //   target: ts.ScriptTarget.ES2022,
-  // };
-
-  // if (configPath) {
-  //   const config = ts.readConfigFile(configPath, ts.sys.readFile);
-
-  //   if (config.error) {
-  //     throw new Error(ts.flattenDiagnosticMessageText(config.error.messageText, '\n'));
-  //   }
-
-  //   const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, dirname(configPath), undefined, configPath);
-
-  //   if (parsed.errors.length > 0) {
-  //     throw new Error(
-  //       parsed.errors.map((error) => ts.flattenDiagnosticMessageText(error.messageText, '\n')).join('\n'),
-  //     );
-  //   }
-
-  //   compilerOptions = parsed.options;
-  // }
-
   const result = ts.resolveModuleName(importSpecifier, resolve(importingFile), compilerOptions, ts.sys);
 
   return result.resolvedModule?.resolvedFileName;
