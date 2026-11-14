@@ -109,4 +109,62 @@ describe('resolveTestDependencies', () => {
       ],
     });
   });
+
+  it('isolates shared module dependencies by test root', () => {
+    const projectA = 'src/project-a/ui/service.test.ts';
+    const projectB = 'src/project-b/ui/service.test.ts';
+    const shared = 'src/shared/service.ts';
+
+    const valueA = 'src/project-a/ui/value.ts';
+    const valueB = 'src/project-b/ui/value.ts';
+
+    const modules = [
+      // Project A dependency graph
+      {
+        file: projectA,
+        testRoot: projectA,
+        dependencies: [shared],
+      },
+      {
+        file: shared,
+        testRoot: projectA,
+        dependencies: [valueA],
+      },
+      {
+        file: valueA,
+        testRoot: projectA,
+        dependencies: [],
+      },
+
+      // Project B dependency graph
+      {
+        file: projectB,
+        testRoot: projectB,
+        dependencies: [shared],
+      },
+      {
+        file: shared,
+        testRoot: projectB,
+        dependencies: [valueB],
+      },
+      {
+        file: valueB,
+        testRoot: projectB,
+        dependencies: [],
+      },
+    ];
+
+    const result = resolveTestDependencies([projectA, projectB], modules);
+
+    expect(result).toEqual([
+      {
+        testFile: projectA,
+        dependencies: [shared, valueA],
+      },
+      {
+        testFile: projectB,
+        dependencies: [shared, valueB],
+      },
+    ]);
+  });
 });
