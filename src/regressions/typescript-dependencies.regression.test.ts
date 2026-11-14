@@ -173,7 +173,6 @@ it('expects the original value', () => expect(value).toBe(1));`,
     const aliasResult = report.testResults.find(({ name }) => name.endsWith('alias.test.ts'));
 
     expect(aliasResult?.status).toBe('failed');
-
     expect(aliasResult?.assertionResults).toEqual([
       expect.objectContaining({
         status: 'failed',
@@ -236,7 +235,6 @@ it('expects the original value', () => expect(value).toBe(1));`,
     const affected = await planTestSelection([{ status: 'modified', path: 'src/value.ts' }], testFiles, repoRoot);
 
     expect([...affected.selectedTests].sort()).toEqual(['src/dynamic-tsx.test.tsx', 'src/static.test.ts']);
-
     expect(affected.unmappedChanges).toEqual([]);
     expect(affected.selectedTests).not.toContain('src/unrelated.test.ts');
 
@@ -308,13 +306,11 @@ it('expects the original value', () => expect(value).toBe(1));`,
     const changedValue = await planTestSelection([{ status: 'modified', path: 'src/value.ts' }], testFiles, repoRoot);
 
     expect([...changedValue.selectedTests].sort()).toEqual(['src/indirect.test.ts', 'src/static.test.ts']);
-
     expect(changedValue.unmappedChanges).toEqual([]);
 
     const changedOther = await planTestSelection([{ status: 'modified', path: 'src/other.ts' }], testFiles, repoRoot);
 
     expect([...changedOther.selectedTests].sort()).toEqual(['src/indirect.test.ts', 'src/unrelated.test.ts']);
-
     expect(changedOther.unmappedChanges).toEqual([]);
   });
 
@@ -337,7 +333,6 @@ it('expects the original value', () => expect(value).toBe(1));`,
     );
 
     await writeFile(join(repoRoot, 'src/project/ui/value.ts'), 'export const value = 2;');
-
     await writeFile(join(repoRoot, 'src/shared/service.ts'), "export { value } from '@app/value.js';");
 
     await writeFile(
@@ -388,7 +383,6 @@ it('expects the original value', () => expect(value).toBe(1));`,
     ]);
 
     expect(affected.selectedTests).not.toContain('src/project/ui/unrelated.test.ts');
-
     expect(affected.unmappedChanges).toEqual([]);
 
     await symlink(resolve('node_modules'), join(repoRoot, 'node_modules'), 'dir');
@@ -504,40 +498,8 @@ it('expects the original value', () => expect(value).toBe(1));`,
     }
 
     await writeFile(join(repoRoot, 'src/project-a/ui/value.ts'), 'export const value = 2;');
-
     await writeFile(join(repoRoot, 'src/project-b/ui/value.ts'), 'export const value = 4;');
-
     await writeFile(join(repoRoot, 'src/shared/service.ts'), "export { value } from '@app/value.js';");
-
-    // await writeFile(
-    //   join(repoRoot, 'src/project/ui/service.test.ts'),
-    //   `import { it, expect } from 'vitest';
-    //   import { value } from '../../shared/service.js';
-
-    //   it('expects the original shared value', () => {
-    //     expect(value).toBe(1);
-    //   });`
-    // );
-
-    // await writeFile(
-    //   join(repoRoot, 'src/project/ui/static.test.ts'),
-    //   `import { it, expect } from 'vitest';
-    //   import { value } from './value.js';
-
-    //   it('accepts integer values', () => {
-    //     expect(Number.isInteger(value)).toBe(true);
-    //   });`,
-    // );
-
-    // await writeFile(
-    //   join(repoRoot, 'src/project/ui/unrelated.test.ts'),
-    //   `import { it, expect} from 'vitest';
-    //   import { other } from '../../other.js';
-
-    //   it('reads an unrelated value', () => {
-    //     expect(other).toBe(1);
-    //   });`
-    // );
 
     const testFiles = [
       'src/project-a/ui/service.test.ts',

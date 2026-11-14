@@ -20,6 +20,26 @@ Forge is being developed around five capabilities:
 
 **Core principle:** Forge must not claim successful validation based on unrelated passing tests, incomplete dependency analysis, or missing execution evidence.
 
+### TypeScript dependency analysis
+
+Forge analyzes TypeScript imports using the applicable project's `tsconfig.json`, including path aliases and inherited compiler options.
+
+Supported dependency patterns include:
+
+- Static imports and re-exports.
+- Literal dynamic imports, including imports nested in TSX expressions.
+- Project-local path aliases resolved through TypeScript's module-resolution API.
+- Transitive dependencies across shared source files.
+- Shared modules consumed by multiple TypeScript projects with different alias mappings.
+
+Dependency graphs are scoped to their originating test roots. This allows the same shared source file to resolve to different dependencies in different projects without incorrectly selecting tests from unrelated projects.
+
+When local imports, path aliases, or nonliteral dynamic imports cannot be resolved, Forge preserves that uncertainty rather than silently discarding the dependency. Node.js built-in modules and dependencies outside the repository are excluded from local dependency tracking.
+
+**Validation:** Regression tests verify dependency selection, project isolation, and execution through Vitest, including propagation of failing assertions as nonzero validation results.
+
+See [#14 — TypeScript path alias resolution](https://github.com/zerogravit1/forge/issues/14) and [PR #23](https://github.com/zerogravit1/forge/pull/23) for implementation details and regression evidence.
+
 ## Current development status
 
 Forge is an early-stage open-source project focused on establishing a reliable TypeScript and Vitest workflow.

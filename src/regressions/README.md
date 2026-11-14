@@ -13,13 +13,13 @@ Use the Node version in `.nvmrc` and install the locked dependencies with `npm c
 From the repository root:
 
 ```bash
-# Opt in to the five remaining quarantined regressions; #13 and #17 also runs. Expected baseline result: five failures.
+# Opt in to the four remaining quarantined regressions; #13 and #17 also runs. Expected baseline result: four failures.
 FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions
 
 # Select a single issue, for example #12.
 FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions -t '#12'
 
-# Normal passing CI workflow; the five new tests are skipped.
+# Normal passing CI workflow; the four new tests are skipped.
 npm run check
 ```
 
@@ -60,12 +60,11 @@ Each row has its own reproduction command; the issue number is the test filter:
 ```bash
 FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions -t '#11'
 FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions -t '#12'
-FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions -t '#14'
 FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions -t '#15'
 FORGE_REGRESSION_BASELINE=1 npm test -- src/regressions -t '#16'
 ```
 
-All seven findings were independently reproduced against baseline commit 6aaef70. Issue #17 has since been corrected and promoted to normal CI. Issues #11-#16 remain quarantined. Assertions on discovery,
+All seven findings were independently reproduced against baseline commit 6aaef70. Issue #17 has since been corrected and promoted to normal CI. Issues #11, #12, #15, #16 remain quarantined. Assertions on discovery,
 selection, and routing fail for their corresponding defects, rather than a
 missing tool or an intentionally failing fixture assertion. For #17 the fixture
 tests themselves pass; the regression fails because Forge executes the wrong
@@ -88,7 +87,7 @@ production tree is exactly that reviewed commit. Verification consists of:
 Observed results at the reviewed implementation:
 
 - Opt-in suite: **7 executed, 7 failed**, all at the defect assertions above.
-- Each issue filter: **1 failed**, with the other six regressions skipped; no
+- Each issue filter: **1 failed**, with the other four regressions skipped; no
   setup, import, or timeout errors substituted for the expected failure.
 - Normal `npm run check`: **95 passed, 8 skipped**. Seven skips are this
   quarantined baseline; the eighth is the existing optional Maven integration
@@ -104,8 +103,9 @@ expectations to match the current omissions or substitute unrelated tests.
 
 | Issue             | Status                                                                   |
 | ----------------- | ------------------------------------------------------------------------ |
-| #11, #12, #14–#16 | Open; regression tests quarantined                                       |
+| #11, #12, #15, #16 | Open; regression tests quarantined                                       |
 | #13               | Fixed on `fix/typescript-dynamic-imports`; regression runs in normal CI  |
+| #14               | Fixed on `fix/typescript-alias-imports`; regression runs in normal CI    |
 | #17               | Fixed on `fix/typescript-target-isolation`; regression runs in normal CI |
 
 ### Issue #17
@@ -131,3 +131,14 @@ expectations to match the current omissions or substitute unrelated tests.
   unnecessarily including unrelated tests.
 - Regression coverage verifies actual Vitest execution, selected test identities,
   test counts, and propagation of failing assertions to a nonzero exit status.
+
+### Issue #14
+
+- TypeScript dependency resolution uses the applicable project's `tsconfig.json`, including path aliases and inherited compiler options.
+- Compiler options are preserved while traversing transitive dependencies, including shared source files outside the consuming project's configuration directory.
+- Dependency graphs are scoped to their originating test roots. The same shared source can resolve to different modules in separate projects without contaminating another project's test selection.
+- Unresolved local aliases remain explicit dependency uncertainty rather than being silently discarded.
+- Node.js built-in modules are excluded from unresolved dependency reporting when no local module is resolved, including configurations using wildcard path aliases.
+- Regression coverage verifies both relative and alias consumers are selected, unrelated tests remain excluded, and failing assertions propagate through real Vitest execution as a nonzero validation result.
+- Multi-project regression coverage verifies that changes to Project A or Project B select only their respective consumers, while changes to shared sources select consumers in both projects.
+- Resolver unit coverage independently verifies context-specific dependency graphs for shared source files.
