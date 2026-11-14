@@ -101,12 +101,12 @@ expectations to match the current omissions or substitute unrelated tests.
 
 ## Remediation status
 
-| Issue             | Status                                                                   |
-| ----------------- | ------------------------------------------------------------------------ |
+| Issue              | Status                                                                   |
+| ------------------ | ------------------------------------------------------------------------ |
 | #11, #12, #15, #16 | Open; regression tests quarantined                                       |
-| #13               | Fixed on `fix/typescript-dynamic-imports`; regression runs in normal CI  |
-| #14               | Fixed on `fix/typescript-alias-imports`; regression runs in normal CI    |
-| #17               | Fixed on `fix/typescript-target-isolation`; regression runs in normal CI |
+| #13                | Fixed on `fix/typescript-dynamic-imports`; regression runs in normal CI  |
+| #14                | Fixed on `fix/typescript-alias-imports`; regression runs in normal CI    |
+| #17                | Fixed on `fix/typescript-target-isolation`; regression runs in normal CI |
 
 ### Issue #17
 
