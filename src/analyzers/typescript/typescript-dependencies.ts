@@ -105,17 +105,19 @@ export function discoverImports(source: string): string[] {
   return analyzeImports(source).imports;
 }
 
-export async function discoverModuleImports(file: string, repoRoot: string): Promise<ModuleDependency> {
+export async function discoverModuleImports(
+  file: string,
+  repoRoot: string,
+  compilerOptions?: ts.CompilerOptions,
+): Promise<ModuleDependency> {
   const absolutePath = resolve(repoRoot, file);
   const source = await readFile(absolutePath, 'utf8');
 
   const { imports: importStatements, unresolvedDynamicImports } = analyzeImports(source, absolutePath);
 
   const resolvedImportPaths: string[] = [];
-
   const unresolvedDependencies: string[] = [...unresolvedDynamicImports];
-
-  const compilerOptions = loadCompilerOptions(absolutePath);
+  const options = compilerOptions ?? loadCompilerOptions(absolutePath);
 
   for (const statement of importStatements) {
     const resolvedPath = resolveImportPath(absolutePath, statement, compilerOptions);
@@ -123,7 +125,7 @@ export async function discoverModuleImports(file: string, repoRoot: string): Pro
     if (!resolvedPath) {
       const isRelative = statement.startsWith('./') || statement.startsWith('../');
 
-      if (isRelative || matchesPathAlias(statement, compilerOptions)) {
+      if (isRelative || matchesPathAlias(statement, options)) {
         unresolvedDependencies.push(statement);
       }
 
@@ -154,31 +156,40 @@ export async function discoverModuleImports(file: string, repoRoot: string): Pro
   };
 }
 
-export async function discoverRepositoryModules(testFiles: string[], repoRoot: string): Promise<ModuleDependency[]> {
-  const visited = new Set<string>();
-  const modules: ModuleDependency[] = [];
-
-  async function visit(file: string): Promise<void> {
-    if (visited.has(file)) {
-      return;
-    }
-
-    visited.add(file);
-
-    const moduleImports = await discoverModuleImports(file, repoRoot);
-
-    modules.push(moduleImports);
-
-    for (const dependency of moduleImports.dependencies) {
-      await visit(dependency);
-    }
-  }
-
+export async function discoverRepositoryModules(
+  testFiles: string[],
+  repoRoot: string
+): Promise<ModuleDependency[]> {
   for (const testFile of testFiles) {
-    await visit(testFile);
-  }
+    const compilationContext = loadCompilerOptions(
+      resolve(repoRoot, testFile),
+    );
 
-  return modules;
+    const visited = new Set<string>();
+
+    async function visit(
+      file: string,
+      context: ts.CompilerOptions,
+    ): Promise<void> {
+      if (visited.has(file)) {
+        return;
+      }
+
+      visited.add(file);
+
+      const moduleImports = await discoverModuleImports(
+        file,
+        repoRoot,
+        context,
+      );
+
+      for (const dependency of moduleImports.dependencies) {
+        await visit(dependency, context);
+      }
+    }
+
+    await visit(testFile, compilationContext);
+  }
 }
 
 export function resolveImportPath(

@@ -317,4 +317,303 @@ it('expects the original value', () => expect(value).toBe(1));`,
 
     expect(changedOther.unmappedChanges).toEqual([]);
   });
+
+  it('#14 preserves project configuration for shared source dependencies', async () => {
+    await mkdir(join(repoRoot, 'src/shared'), { recursive: true });
+    await mkdir(join(repoRoot, 'src/project/ui'), { recursive: true });
+
+    await writeFile(
+      join(repoRoot, 'src/project/tsconfig.json'),
+      JSON.stringify({
+        compilerOptions: {
+          module: 'NodeNext',
+          moduleResolution: 'NodeNext',
+          paths: {
+            '@app/*': ['./ui/*'],
+          },
+        },
+        include: ['ui', '../shared'],
+      }),
+    );
+
+    await writeFile(
+      join(repoRoot, 'src/project/ui/value.ts'),
+      'export const value = 2;',
+    );
+
+    await writeFile(
+      join(repoRoot, 'src/shared/service.ts'),
+      "export { value } from '@app/value.js';",
+    );
+
+    await writeFile(
+      join(repoRoot, 'src/project/ui/service.test.ts'),
+      `import { it, expect } from 'vitest';
+      import { value } from '../../shared/service.js';
+
+      it('expects the original shared value', () => {
+        expect(value).toBe(1);
+      });`
+    );
+
+    await writeFile(
+      join(repoRoot, 'src/project/ui/static.test.ts'),
+      `import { it, expect } from 'vitest';
+      import { value } from './value.js';
+
+      it('accepts integer values', () => {
+        expect(Number.isInteger(value)).toBe(true);
+      });`,
+    );
+
+    await writeFile(
+      join(repoRoot, 'src/project/ui/unrelated.test.ts'),
+      `import { it, expect} from 'vitest';
+      import { other } from '../../other.js';
+
+      it('reads an unrelated value', () => {
+        expect(other).toBe(1);
+      });`
+    );
+
+    const testFiles = [
+      'src/project/ui/service.test.ts',
+      'src/project/ui/static.test.ts',
+      'src/project/ui/unrelated.test.ts',
+    ];
+
+    const affected = await planTestSelection(
+      [{ status: 'modified', path: 'src/project/ui/value.ts' }],
+      testFiles,
+      repoRoot,
+    );
+
+    expect([...affected.selectedTests].sort()).toEqual([
+      'src/project/ui/service.test.ts',
+      'src/project/ui/static.test.ts',
+    ]);
+
+    expect(affected.selectedTests).not.toContain(
+      'src/project/ui/unrelated.test.ts',
+    );
+
+    expect(affected.unmappedChanges).toEqual([]);
+
+    await symlink(resolve('node_modules'), join(repoRoot, 'node_modules'), 'dir');
+
+    await writeFile(
+      join(repoRoot, 'vitest.config.mjs'),
+      `export default {
+        resolve: {
+          alias: {
+            '@app': new URL('./src/project/ui', import.meta.url).pathname,
+          },
+        },
+        test: {
+          include: ['src/**/*.test.ts'],
+          maxWorkers: 1,
+          reporters: ['json'],
+          outputFile: 'results.json',
+        },
+      };`,
+    );
+
+    const runner = createVitestRunner();
+    const result = await runner.run(affected.selectedTests, repoRoot);
+
+    expect(result.exitCode).toBe(1);
+
+    const report = JSON.parse(
+      await readFile(join(repoRoot, 'results.json'), 'utf8'),
+    ) as VitestReport;
+
+    expect(report).toMatchObject({
+      numTotalTests: 2,
+      numPassedTests: 1,
+      numFailedTests: 1,
+    });
+
+    expect(
+      report.testResults
+        .map(({ name }) => relative(repoRoot, name).replaceAll('\\', '/'))
+        .sort(),
+    ).toEqual([
+      'src/project/ui/service.test.ts',
+      'src/project/ui/static.test.ts',
+    ]);
+
+    const serviceResult = report.testResults.find(({ name }) =>
+      name.endsWith('service.test.ts'),
+    );
+
+    expect(serviceResult?.status).toBe('failed');
+
+    expect(serviceResult?.assertionResults).toEqual([
+      expect.objectContaining({
+        status: 'failed',
+        failureMessages: expect.arrayContaining([
+          expect.stringContaining('expected 2 to be 1'),
+        ]),
+      }),
+    ]);
+
+    const fullResult = await runner.run(testFiles, repoRoot);
+
+    expect(fullResult.exitCode).toBe(1);
+
+    const fullReport = JSON.parse(
+      await readFile(join(repoRoot, 'results.json'), 'utf8'),
+    ) as VitestReport;
+
+    expect(fullReport).toMatchObject({
+      numTotalTests: 3,
+      numPassedTests: 2,
+      numFailedTests: 1,
+    });
+  });
+
+  it('#14 preserves multi-project configuration for shared source dependencies', async () => {
+    await mkdir(join(repoRoot, 'src/shared'), { recursive: true });
+    await mkdir(join(repoRoot, 'src/project-a/ui'), { recursive: true });
+    await mkdir(join(repoRoot, 'src/project-b/ui'), { recursive: true });
+
+    for (const project of ['project-a', 'project-b']) {
+      await writeFile(
+        join(repoRoot, `src/${project}/tsconfig.json`),
+        JSON.stringify({
+          compilerOptions: {
+            module: 'NodeNext',
+            moduleResolution: 'NodeNext',
+            paths: {
+              '@app/*': ['./ui/*'],
+            },
+          },
+          include: ['ui', '../shared'],
+        }),
+      );
+
+      await writeFile(
+        join(repoRoot, `src/${project}/ui/service.test.ts`),
+        `import { it, expect } from 'vitest';
+        import { value } from '../../shared/service.js';
+
+        it('expects the original shared value', () => {
+          expect(value).toBe(1);
+        });`
+      );
+
+      await writeFile(
+        join(repoRoot, `src/${project}/ui/static.test.ts`),
+        `import { it, expect } from 'vitest';
+        import { value } from './value.js';
+
+        it('accepts integer values', () => {
+          expect(Number.isInteger(value)).toBe(true);
+        });`,
+      );
+
+      await writeFile(
+        join(repoRoot, `src/${project}/ui/unrelated.test.ts`),
+        `import { it, expect} from 'vitest';
+        import { other } from '../../other.js';
+
+        it('reads an unrelated value', () => {
+          expect(other).toBe(1);
+        });`
+      );
+    }
+
+    await writeFile(
+      join(repoRoot, 'src/project-a/ui/value.ts'),
+      'export const value = 2;',
+    );
+
+    await writeFile(
+      join(repoRoot, 'src/project-b/ui/value.ts'),
+      'export const value = 4;',
+    );
+
+    await writeFile(
+      join(repoRoot, 'src/shared/service.ts'),
+      "export { value } from '@app/value.js';",
+    );
+
+    // await writeFile(
+    //   join(repoRoot, 'src/project/ui/service.test.ts'),
+    //   `import { it, expect } from 'vitest';
+    //   import { value } from '../../shared/service.js';
+
+    //   it('expects the original shared value', () => {
+    //     expect(value).toBe(1);
+    //   });`
+    // );
+
+    // await writeFile(
+    //   join(repoRoot, 'src/project/ui/static.test.ts'),
+    //   `import { it, expect } from 'vitest';
+    //   import { value } from './value.js';
+
+    //   it('accepts integer values', () => {
+    //     expect(Number.isInteger(value)).toBe(true);
+    //   });`,
+    // );
+
+    // await writeFile(
+    //   join(repoRoot, 'src/project/ui/unrelated.test.ts'),
+    //   `import { it, expect} from 'vitest';
+    //   import { other } from '../../other.js';
+
+    //   it('reads an unrelated value', () => {
+    //     expect(other).toBe(1);
+    //   });`
+    // );
+
+    const testFiles = [
+      'src/project-a/ui/service.test.ts',
+      'src/project-a/ui/static.test.ts',
+      'src/project-a/ui/unrelated.test.ts',
+      'src/project-b/ui/service.test.ts',
+      'src/project-b/ui/static.test.ts',
+      'src/project-b/ui/unrelated.test.ts',
+    ];
+
+    const changedA = await planTestSelection(
+      [{ status: 'modified', path: 'src/project-a/ui/value.ts' }],
+      testFiles,
+      repoRoot
+    )
+
+    expect([...changedA.selectedTests].sort()).toEqual([
+      'src/project-a/ui/service.test.ts',
+      'src/project-a/ui/static.test.ts',
+    ]);
+
+    expect(changedA.unmappedChanges).toEqual([]);
+
+    const changedB = await planTestSelection(
+      [{ status: 'modified', path: 'src/project-b/ui/value.ts' }],
+      testFiles,
+      repoRoot
+    )
+
+    expect([...changedB.selectedTests].sort()).toEqual([
+      'src/project-b/ui/service.test.ts',
+      'src/project-b/ui/static.test.ts',
+    ]);
+
+    expect(changedB.unmappedChanges).toEqual([]);
+
+    const changedShared = await planTestSelection(
+      [{ status: 'modified', path: 'src/shared/service.ts' }],
+      testFiles,
+      repoRoot,
+    );
+
+    expect([...changedShared.selectedTests].sort()).toEqual([
+      'src/project-a/ui/service.test.ts',
+      'src/project-b/ui/service.test.ts',
+    ]);
+
+    expect(changedShared.unmappedChanges).toEqual([]);
+  });
 });
