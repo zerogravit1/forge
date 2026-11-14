@@ -1,6 +1,7 @@
 import ts from 'typescript';
 import { readFile } from 'fs/promises';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
+import { isBuiltin } from 'node:module';
 
 import type { ModuleDependency } from '../../models/module-dependency.js';
 
@@ -120,9 +121,13 @@ export async function discoverModuleImports(
   const options = compilerOptions ?? loadCompilerOptions(absolutePath);
 
   for (const statement of importStatements) {
-    const resolvedPath = resolveImportPath(absolutePath, statement, compilerOptions);
+    const resolvedPath = resolveImportPath(absolutePath, statement, options);
 
     if (!resolvedPath) {
+      if (isBuiltin(statement)) {
+        continue;
+      }
+
       const isRelative = statement.startsWith('./') || statement.startsWith('../');
 
       if (isRelative || matchesPathAlias(statement, options)) {
@@ -156,40 +161,34 @@ export async function discoverModuleImports(
   };
 }
 
-export async function discoverRepositoryModules(
-  testFiles: string[],
-  repoRoot: string
-): Promise<ModuleDependency[]> {
+export async function discoverRepositoryModules(testFiles: string[], repoRoot: string): Promise<ModuleDependency[]> {
+  const modules: ModuleDependency[] = [];
+
   for (const testFile of testFiles) {
-    const compilationContext = loadCompilerOptions(
-      resolve(repoRoot, testFile),
-    );
+    const compilationContext = loadCompilerOptions(resolve(repoRoot, testFile));
 
     const visited = new Set<string>();
 
-    async function visit(
-      file: string,
-      context: ts.CompilerOptions,
-    ): Promise<void> {
+    async function visit(file: string): Promise<void> {
       if (visited.has(file)) {
         return;
       }
 
       visited.add(file);
 
-      const moduleImports = await discoverModuleImports(
-        file,
-        repoRoot,
-        context,
-      );
+      const moduleImports = await discoverModuleImports(file, repoRoot, compilationContext);
+
+      modules.push({ ...moduleImports, testRoot: testFile });
 
       for (const dependency of moduleImports.dependencies) {
-        await visit(dependency, context);
+        await visit(dependency);
       }
     }
 
-    await visit(testFile, compilationContext);
+    await visit(testFile);
   }
+
+  return modules;
 }
 
 export function resolveImportPath(

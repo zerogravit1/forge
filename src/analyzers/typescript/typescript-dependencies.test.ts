@@ -287,6 +287,42 @@ describe('discoverModuleImports', () => {
       });
     });
   });
+
+  it('excludes Node builtins while preserving wildcard alias resolution', async () => {
+    await withTempRepository('forge-tsconfig-wildcard-', async (repo) => {
+      await repo.write(
+        'tsconfig.json',
+        JSON.stringify({
+          compilerOptions: {
+            module: 'NodeNext',
+            moduleResolution: 'NodeNext',
+            paths: {
+              '*': ['./src/*'],
+            },
+          },
+        }),
+      );
+
+      await repo.write('src/value.ts', 'export const value = 1;');
+
+      await repo.write(
+        'src/consumer.test.ts',
+        [
+          "import { join } from 'node:path';",
+          "import { value } from 'value.js';",
+          "import { missing } from '@app/missing.js';",
+        ].join('\n'),
+      );
+
+      const result = await discoverModuleImports('src/consumer.test.ts', repo.root);
+
+      expect(result).toEqual({
+        file: 'src/consumer.test.ts',
+        dependencies: ['src/value.ts'],
+        unresolvedDependencies: ['@app/missing.js'],
+      });
+    });
+  });
 });
 
 describe('discoverRepositoryModules', () => {
@@ -295,14 +331,16 @@ describe('discoverRepositoryModules', () => {
 
     expect(modules).toEqual(
       expect.arrayContaining([
-        {
+        expect.objectContaining({
           file: 'src/cli.test.ts',
+          testRoot: 'src/cli.test.ts',
           dependencies: expect.arrayContaining(['src/cli.ts']),
-        },
-        {
+        }),
+        expect.objectContaining({
           file: 'src/cli.ts',
+          testRoot: 'src/cli.test.ts',
           dependencies: expect.arrayContaining(['src/config/cli-options.ts', 'src/changes/git-changes.ts']),
-        },
+        }),
       ]),
     );
   });
