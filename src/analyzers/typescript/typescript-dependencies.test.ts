@@ -11,6 +11,8 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { withTempRepository } from '../../helpers/temp-repo.js';
+import { resolveTestDependencies } from '../../graph/resolve-test-dependencies.js';
+import { selectTests } from '../../selection/select-tests.js';
 
 describe('discoverImports', () => {
   it('returns the imports declared in a source file', () => {
@@ -343,5 +345,127 @@ describe('discoverRepositoryModules', () => {
         }),
       ]),
     );
+  });
+
+  it('isolates cached modules by Typescript configuration', async () => {
+    await withTempRepository('forge-cache-context-', async (repo) => {
+      await repo.write('shared/consumer.ts', "import { value } from '@app/value.js';");
+
+      for (const project of ['server', 'web']) {
+        await repo.write(
+          `apps/${project}/tsconfig.json`,
+          JSON.stringify({
+            compilerOptions: {
+              module: 'NodeNext',
+              moduleResolution: 'NodeNext',
+              paths: {
+                '@app/*': ['./src/*'],
+              },
+            },
+          }),
+        );
+
+        await repo.write(`apps/${project}/src/value.ts`, `export const value = '${project}';`);
+
+        await repo.write(`apps/${project}/src/consumer.test.ts`, "import '../../../shared/consumer.js';");
+      }
+
+      const tests = ['apps/server/src/consumer.test.ts', 'apps/web/src/consumer.test.ts'];
+
+      const modules = await discoverRepositoryModules(tests, repo.root);
+
+      for (const project of ['server', 'web']) {
+        const testRoot = `apps/${project}/src/consumer.test.ts`;
+
+        const sharedModule = modules.find(
+          (module) => module.testRoot === testRoot && module.file === 'shared/consumer.ts',
+        );
+
+        expect(sharedModule?.dependencies).toContain(`apps/${project}/src/value.ts`);
+
+        expect(sharedModule?.dependencies).not.toContain(
+          `apps/${project === 'server' ? 'web' : 'server'}/src/value.ts`,
+        );
+      }
+    });
+  });
+
+  it('preserves shared dependencies for each test root', async () => {
+    await withTempRepository('forge-cache-shared-', async (repo) => {
+      const tests = ['src/first.test.ts', 'src/second.test.ts'];
+
+      await repo.write('src/shared/value.ts', 'export const value = 42;');
+
+      await repo.write('src/shared/consumer.ts', "import { value } from './value.js'; export { value };");
+
+      for (const test of tests) {
+        await repo.write(test, "import { value } from './shared/consumer.js';");
+      }
+
+      const modules = await discoverRepositoryModules(tests, repo.root);
+
+      for (const testRoot of tests) {
+        const sharedModule = modules.find(
+          (module) => module.testRoot === testRoot && module.file === 'src/shared/consumer.ts',
+        );
+
+        expect(sharedModule?.dependencies).toContain('src/shared/value.ts');
+
+        expect(modules).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              file: 'src/shared/value.ts',
+              testRoot,
+              dependencies: [],
+            }),
+          ]),
+        );
+      }
+    });
+  });
+
+  it('preserves unresolved dependencies across cached test graphs', async () => {
+    await withTempRepository('forge-cache-unresolved-', async (repo) => {
+      const tests = ['src/first.test.ts', 'src/second.test.ts'];
+
+      await repo.write('src/shared/consumer.ts', "import './missing.js'; export const value = 42;");
+
+      for (const test of tests) {
+        await repo.write(test, "import { value } from './shared/consumer.js';");
+      }
+
+      const modules = await discoverRepositoryModules(tests, repo.root);
+
+      const dependencies = resolveTestDependencies(tests, modules);
+
+      for (const test of dependencies) {
+        expect(test.dependencies).toContain('src/shared/consumer.ts');
+
+        expect(test.unresolvedDependencies).toEqual(
+          expect.arrayContaining([
+            {
+              file: 'src/shared/consumer.ts',
+              specifier: './missing.js',
+            },
+          ]),
+        );
+      }
+
+      // Only the first test file changed.
+      // The second should still be selected conservatively
+      // because its dependency graph contains uncertainty.
+      const selection = selectTests(
+        [
+          {
+            status: 'modified',
+            path: 'src/first.test.ts',
+          },
+        ],
+        dependencies,
+      );
+
+      expect(selection.selectedTests).toEqual(tests);
+      expect(selection.unmappedChanges).toEqual([]);
+    });
   });
 });

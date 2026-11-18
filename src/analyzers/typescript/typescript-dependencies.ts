@@ -164,8 +164,19 @@ export async function discoverModuleImports(
 export async function discoverRepositoryModules(testFiles: string[], repoRoot: string): Promise<ModuleDependency[]> {
   const modules: ModuleDependency[] = [];
 
+  const analysisCache = new Map<string, Promise<ModuleDependency>>();
+  const optionsCache = new Map<string, ts.CompilerOptions>();
+
   for (const testFile of testFiles) {
-    const compilationContext = loadCompilerOptions(resolve(repoRoot, testFile));
+    const testPath = resolve(repoRoot, testFile);
+
+    const configPath = ts.findConfigFile(dirname(testPath), ts.sys.fileExists, 'tsconfig.json');
+
+    const contextKey = configPath ? resolve(configPath) : '<default>';
+
+    const compilationContext = optionsCache.get(contextKey) ?? loadCompilerOptions(testPath);
+
+    optionsCache.set(contextKey, compilationContext);
 
     const visited = new Set<string>();
 
@@ -176,7 +187,16 @@ export async function discoverRepositoryModules(testFiles: string[], repoRoot: s
 
       visited.add(file);
 
-      const moduleImports = await discoverModuleImports(file, repoRoot, compilationContext);
+      const cacheKey = JSON.stringify([contextKey, file]);
+
+      let analysis = analysisCache.get(cacheKey);
+
+      if (!analysis) {
+        analysis = discoverModuleImports(file, repoRoot, compilationContext);
+        analysisCache.set(cacheKey, analysis);
+      }
+
+      const moduleImports = await analysis;
 
       modules.push({ ...moduleImports, testRoot: testFile });
 
