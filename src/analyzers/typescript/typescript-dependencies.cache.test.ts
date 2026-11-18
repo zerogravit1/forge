@@ -33,7 +33,7 @@ describe('discoverRepositoryModules caching', () => {
 
       const sharedReads = readFileMock.mock.calls.filter(([path]) => String(path) === sharedPath);
 
-      // The expansive module analysis should happen once.
+      // The expensive module analysis should happen once.
       expect(sharedReads).toHaveLength(1);
 
       // Both tests must retain their own dependency records.
