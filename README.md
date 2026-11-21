@@ -51,3 +51,10 @@ Java and Maven integrations also exist but have known limitations.
 Some TypeScript dependency patterns, including dynamic imports and project path aliases, are not yet handled correctly. These limitations are tracked in GitHub issues.
 
 Forge is not yet packaged for general installation. The current workflow is intended for repository development and validation while the TypeScript MVP is completed.
+
+## License
+
+Copyright © 2026 Jonathan Schaffer.
+
+Licensed under the Apache License, Version 2.0.
+See [LICENSE](LICENSE) for details.
