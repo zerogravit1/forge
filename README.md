@@ -48,7 +48,7 @@ The current implementation includes a CLI with `plan` and `run` commands, config
 
 Java and Maven integrations also exist but have known limitations.
 
-Some TypeScript dependency patterns, including dynamic imports and project path aliases, are not yet handled correctly. These limitations are tracked in GitHub issues.
+Dynamic imports and project path aliases have regression coverage and are supported in the current TypeScript workflow. Known Java/Maven correctness limitations remain tracked in issues [#11](https://github.com/zerogravit1/forge/issues/11), [#12](https://github.com/zerogravit1/forge/issues/12), [#15](https://github.com/zerogravit1/forge/issues/15), and [#16](https://github.com/zerogravit1/forge/issues/16). Forge does not yet emit the proposed versioned validation evidence artifact; see [#26](https://github.com/zerogravit1/forge/issues/26) for the design milestone.
 
 Forge is not yet packaged for general installation. The current workflow is intended for repository development and validation while the TypeScript MVP is completed.
 
