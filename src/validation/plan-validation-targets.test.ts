@@ -47,6 +47,7 @@ describe('planValidationTargets', () => {
     expect(result.unmatchedChanges).toEqual([]);
     expect(result.plans).toHaveLength(2);
 
+    expect(result.plans[0]?.discoveredTests).toEqual(['src/cli.test.ts']);
     expect(result.plans[0]?.selection.selectedTests).toEqual(['src/cli.test.ts']);
 
     expect(result.plans[1]?.selection.selectedTests).toEqual([

@@ -82,6 +82,7 @@ export function createValidationTargets(config: ForgeConfig, resolved: ResolvedT
 
         targets.push({
           id: targetConfig.id,
+          onUnmappedChanges: targetConfig.onUnmappedChanges,
 
           includesChange: (change) => change.path.startsWith(`${targetConfig.projectRoot}/`),
 
@@ -103,6 +104,7 @@ export function createValidationTargets(config: ForgeConfig, resolved: ResolvedT
 
         targets.push({
           id: targetConfig.id,
+          onUnmappedChanges: targetConfig.onUnmappedChanges,
 
           includesChange: (change) =>
             sourceRoots.some((root) => change.path === root || change.path.startsWith(`${root}/`)),

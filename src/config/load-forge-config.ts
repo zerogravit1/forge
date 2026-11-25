@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-import type { ForgeConfig } from './forge-config.js';
+import type { ForgeConfig, UnmappedChangesPolicy } from './forge-config.js';
 
 export async function loadForgeConfig(repoRoot: string): Promise<ForgeConfig> {
   const configPath = resolve(repoRoot, 'forge.config.json');
@@ -156,9 +156,33 @@ function validateTargets(value: unknown): ForgeConfig['targets'] {
         root: target.root,
         adapter: target.adapter,
         runner: target.runner,
+        ...(Object.hasOwn(target, 'execution') && {
+          execution: validateTargetExecution(target.execution, `targets.${namespace}.${name}.execution`),
+        }),
       };
     }
   }
 
   return targets;
+}
+
+function validateTargetExecution(value: unknown, path: string): { onUnmappedChanges?: UnmappedChangesPolicy } {
+  if (!isRecord(value)) {
+    throw new Error(`Invalid Forge configuration: ${path} must be an object`);
+  }
+
+  if (Object.keys(value).some((key) => key !== 'onUnmappedChanges')) {
+    throw new Error(`Invalid Forge configuration: ${path} only supports onUnmappedChanges`);
+  }
+
+  if (!Object.hasOwn(value, 'onUnmappedChanges')) {
+    return {};
+  }
+
+  const { onUnmappedChanges } = value;
+  if (onUnmappedChanges !== 'strict' && onUnmappedChanges !== 'full-target') {
+    throw new Error(`Invalid Forge configuration: ${path}.onUnmappedChanges must be strict or full-target`);
+  }
+
+  return { onUnmappedChanges };
 }

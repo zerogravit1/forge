@@ -30,6 +30,31 @@ describe('resolveTargetConfigs', () => {
     ]);
   });
 
+  it('resolves fallback only for the target that opts in', () => {
+    const config: ForgeConfig = {
+      version: '1.0.0',
+      roots: { app: { main: { path: '.', sources: ['src'], tests: ['tests'] } } },
+      adapters: { ts: { type: 'typescript' } },
+      runners: { vitest: { type: 'vitest' } },
+      targets: {
+        app: {
+          'full-suite': {
+            root: 'app.main',
+            adapter: ['ts'],
+            runner: ['vitest'],
+            execution: { onUnmappedChanges: 'full-target' },
+          },
+          selected: { root: 'app.main', adapter: ['ts'], runner: ['vitest'] },
+        },
+      },
+    };
+
+    expect(resolveTargetConfigs(config)).toEqual([
+      expect.objectContaining({ id: 'app.full-suite', onUnmappedChanges: 'full-target' }),
+      expect.objectContaining({ id: 'app.selected', onUnmappedChanges: 'strict' }),
+    ]);
+  });
+
   it('rejects a target referencing an unknown root', () => {
     const config: ForgeConfig = {
       version: '1.0.0',
