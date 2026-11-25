@@ -86,16 +86,22 @@ Each discovered test has one decision:
 - `excluded`: requires evidence for no impact **within the declared analysis scope**. A path to an unchanged file only establishes that dependency. Exclusion also requires evidence that the scoped analysis covers the relationships that could lead to the changed inputs.
 - `uncertain`: impact is unresolved, with an explicit reason; must never be silently treated as an unaffected test.
 
-Unmatched source changes, unknown or unsupported dependency patterns, missing target discovery, unknown configuration, and unavailable runner observations are surfaced explicitly. Record uncertainty at the affected test or target even when another known relationship maps the changed file. When conservative selection includes uncertain tests, record both the inclusion and its uncertainty reason.
+The proposed artifact should surface unmatched source changes, unknown or unsupported dependency patterns, missing target discovery, unknown configuration, and unavailable runner observations. Record uncertainty at the affected test or target even when another known relationship maps the changed file. When conservative selection includes uncertain tests, record both the inclusion and its uncertainty reason.
 
 A complete selection requires defensible decisions for all in-scope discovered tests and explicit accounting for every changed file. It is not proof of coverage outside the declared scope.
 
 ## Execution integrity
 
+### Current selection gate
+
+The current `run` selection gate returns exit `1` before starting any runner when planning reports an unmatched change (no validation target) or an unmapped change within a target (no known test mapping). A run can clear this gate while broader uncertainty remains. A known dependency can map a change even when another consumer is untracked, and recognized unresolved imports can add tests through conservative selection. [Current CLI gate](https://github.com/zerogravit1/forge/blob/9702b8235e6d0d9d599561edb6f2980e04e725d8/src/cli.ts#L124-L154) · [Selection rules](https://github.com/zerogravit1/forge/blob/9702b8235e6d0d9d599561edb6f2980e04e725d8/src/selection/select-tests.ts#L9-L33)
+
+### Proposed outcome and fallback rules
+
 - Require a defensible validation scope, reconciled observations of intended tests, and evidence that required execution and lifecycle phases succeeded before reporting `validation: passed`. A zero process exit supplies only one part of that evidence.
 - Missing or contradictory test results and unverified required shutdown keep the evidence incomplete. The shutdown marker establishes that Vitest's close sequence returned. The runner version and configuration can affect how teardown errors are reported.
 - Report a known test, runner, or required lifecycle failure as failed while preserving any incomplete selection or observations. Keep the reason for an intentional no-test run distinct from failed discovery or missing tests. A `plan` reports execution and validation as `not-run`.
-- Strict execution currently refuses an incomplete selection. An explicitly approved fallback would need a defensible scope and independent execution evidence. Preserve the original incomplete selection even if fallback execution passes. The public representation and exit behavior remain decisions for that policy work.
+- An explicitly approved fallback would need a detected selection gap, a defensible scope, and independent execution evidence. Preserve the original incomplete selection even if fallback execution passes. How to act on broader uncertainty, and how to represent fallback and its exit behavior publicly, remain decisions for policy work.
 
 ## Reproducibility and portability
 
@@ -122,6 +128,15 @@ Timing fields must be measured, labeled by operation, and nullable when unavaila
 
 The expected test mapping must come from each fixture's independently declared dependency relationships, **not** from the Forge-produced plan.
 
+### Independently reproduced selection-gate controls
+
+Retain the worker-only and full PR #28 refusal cases below as controls for a detected unmapped change. Retain these two controls from [`develop` at `9702b82`](https://github.com/zerogravit1/forge/commit/9702b8235e6d0d9d599561edb6f2980e04e725d8) for changes that clear the gate:
+
+| Fixture                                                                                                                                                    | Observed current behavior                                                                                                                           | What future work should verify                                                                                                                                                              |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Change `src/worker.ts`. `test/direct.test.ts` imports it, and `test/spawn.test.ts` launches it using `spawn` and `new URL(..., import.meta.url)`.          | The direct import maps the change. The subprocess consumer is omitted. The recording runner receives only the direct test, and `run` returns `0`.   | Selection evidence accounts for the subprocess consumer or records uncertainty even when the direct mapping clears the current gate.                                                        |
+| Change `src/value.ts`. `src/known.test.ts` imports it statically, and `src/uncertain.test.ts` uses `import(dependency)` where `dependency` holds the path. | The static test maps the change. Conservative selection includes the unresolved consumer. Both tests run and pass in Vitest, and `run` returns `0`. | Preserve why the second test was selected and the unresolved relationship alongside its observed pass. Treat conservative selection and any later execution fallback as distinct decisions. |
+
 ## Established baseline and remaining interface gaps
 
 [PR #28](https://github.com/zerogravit1/forge/pull/28) completed the private Vitest execution-evidence increment. Independent review approved head [`0287f05`](https://github.com/zerogravit1/forge/commit/0287f0574deb6a889d3388d876e3fc98b53922ed), and it was merged into `develop` as [`9702b82`](https://github.com/zerogravit1/forge/commit/9702b8235e6d0d9d599561edb6f2980e04e725d8). The concrete runner returns invocation-bound requested and observed specifications, case counts, reconciliation, shutdown status, and subprocess exit status. The parent checks project identity against the worker's Vitest discovery inventory. `SelectionResult` still exposes `selectedTests` and `unmappedChanges`, and the shared `TestRunner` interface still exposes only `exitCode`. Selection provenance and carrying observations through the shared runner and CLI boundaries remain open.
@@ -133,7 +148,7 @@ A worker-only plan on the pre-PR base [`cc4bf53`](https://github.com/zerogravit1
 ## Proposed implementation order
 
 1. **Completed:** Preserve private, invocation-bound Vitest observations and reconciliation in PR #28.
-2. Refine fallback execution before increment 2. Keep strict as the default. Evaluate an opt-in full-target policy only when the affected validation target and its boundaries are established. Unknown scope retains strict refusal. Agree on evidence and verification requirements before approving any implementation or exit policy.
+2. Refine fallback execution before increment 2. Keep the current refusal behavior as the default. Start with gaps the current gate reports. Evaluate opt-in full-target execution for unmapped changes only when the affected target and its boundaries are established. A change with no matching target still stops execution. Agree on evidence and verification requirements before approving any implementation or exit policy.
 3. Preserve dependency provenance and uncertainty during TypeScript selection. Track subprocess dependency discovery as separate work. Use direct launch, transitive launch, and unrelated-change controls to test its boundaries.
 4. Revisit the portable draft after selection and fallback facts are established. Review semantics, field names, privacy, compatibility, and schema versioning before approving the schema and its fixtures.
 5. Emit a deterministic plan artifact, then a verified run artifact that retains selected and observed scope, failure, and incompleteness.
