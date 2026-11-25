@@ -61,6 +61,31 @@ Document material architectural decisions, assumptions, tradeoffs, and known lim
 
 The objective is not to predict every future requirement, but to make informed decisions that preserve reasonable opportunities for future development.
 
+## Clarity and Maintainability
+
+Produce artifacts for human understanding first. Code, tests, configuration, documentation, architectural decisions, and validation evidence should communicate their purpose, behavior, and intent clearly.
+
+- Prefer straightforward implementations over clever or unnecessarily compact solutions.
+- Use meaningful names, logical organization, and language-appropriate conventions.
+- Make assumptions, constraints, and non-obvious decisions explicit.
+- Introduce abstractions when they improve understanding or address a demonstrated engineering need.
+- Write tests that communicate the expected behavior and why it matters.
+- Write documentation that enables another engineer to understand, reproduce, and extend the work independently.
+
+Clarity should yield to performance considerations only when measurable or otherwise demonstrable performance requirements justify additional complexity.
+
+When performance requirements necessitate a less straightforward implementation:
+
+- Establish the performance requirement and relevant baseline.
+- Explain why the clearer implementation is insufficient.
+- Demonstrate the benefit of the alternative implementation.
+- Document the resulting complexity and its tradeoffs.
+- Isolate performance-critical complexity where practical.
+
+Do not sacrifice correctness, security, or reliability for either clarity or performance.
+
+The objective is to produce artifacts that remain understandable, maintainable, and verifiable by engineers who were not involved in their creation.
+
 ## Inputs required before work starts
 
 - A specific issue and desired outcome with acceptance criteria.
