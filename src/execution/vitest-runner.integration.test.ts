@@ -28,6 +28,7 @@ describe('Vitest runner integration', () => {
         'packages/app/vitest.config.mjs',
         `export default {
           test: {
+            name: 'app',
             include: [
               'tests/**/*.test.ts',
               'src/tests/**/*.test.ts'
@@ -62,6 +63,25 @@ describe('Vitest runner integration', () => {
       const result = await runner.run(selectedTests, repoRoot);
 
       expect.soft(result.exitCode).toBe(0);
+      expect(result.shutdown).toBe('completed');
+      expect(result.evidence).toMatchObject({ status: 'complete', unhandledErrorCount: 0 });
+      if (!('expected' in result.evidence)) throw new Error('Expected a Vitest specification result');
+
+      const expectedSpecifications = result.evidence.expected;
+      const observedSpecifications = result.evidence.observed;
+      expect(expectedSpecifications).toMatchObject([
+        { file: 'tests/App.test.ts', project: 'app', kind: 'runtime' },
+        { file: 'tests/Orders.test.ts', project: 'app', kind: 'runtime' },
+      ]);
+      expect(observedSpecifications).toHaveLength(2);
+      for (const { id, file } of expectedSpecifications) {
+        expect(observedSpecifications.find((specification) => specification.id === id)).toMatchObject({
+          file,
+          project: 'app',
+          state: 'passed',
+          cases: { passed: 1, failed: 0, skipped: 0, pending: 0 },
+        });
+      }
 
       const report: unknown = JSON.parse(await readFile(join(appRoot, 'app-results.json'), 'utf8'));
 
@@ -82,6 +102,115 @@ describe('Vitest runner integration', () => {
     } finally {
       await rm(repoRoot, { recursive: true, force: true });
     }
+  }, 30_000);
+
+  it.each([
+    {
+      scenario: 'preserves an observed assertion failure and its nonzero exit',
+      declaration: 'test',
+      nativeOutcome: 'failed',
+      failed: 1,
+      skipped: 0,
+      exitCode: 1,
+      evidenceStatus: 'complete',
+    },
+    {
+      scenario: 'records skipped-only execution as incomplete despite a zero exit',
+      declaration: 'test.skip',
+      nativeOutcome: 'skipped',
+      failed: 0,
+      skipped: 1,
+      exitCode: 0,
+      evidenceStatus: 'incomplete',
+    },
+  ])(
+    '$scenario',
+    async ({ declaration, nativeOutcome, failed, skipped, exitCode, evidenceStatus }) => {
+      await withTempRepository('forge-vitest-evidence-', async (repo) => {
+        await repo.linkNodeModules();
+        await repo.write(
+          'vitest.config.mjs',
+          `export default {
+          test: { maxWorkers: 1, reporters: ['json'], outputFile: 'vitest-results.json' }
+        };`,
+        );
+
+        const testFile = 'tests/Expected.test.ts';
+        const testTitle = 'deliberate failing assertion';
+        await repo.write(
+          testFile,
+          `import { test, expect } from 'vitest';
+         ${declaration}(${JSON.stringify(testTitle)}, () => expect(1).toBe(2));`,
+        );
+
+        const runner = createVitestRunner();
+        const result = await runner.run([testFile], repo.root);
+
+        // The fixture's own Vitest reporter corroborates the identity and case outcome.
+        const report: unknown = JSON.parse(await readFile(repo.path('vitest-results.json'), 'utf8'));
+        expect(report).toMatchObject({
+          numTotalTests: 1,
+          numPassedTests: 0,
+          numFailedTests: failed,
+          numPendingTests: skipped,
+          testResults: [{ name: repo.path(testFile), assertionResults: [{ title: testTitle, status: nativeOutcome }] }],
+        });
+
+        expect(result.exitCode).toBe(exitCode);
+        expect(result.evidence).toMatchObject({ status: evidenceStatus, unhandledErrorCount: 0 });
+        if (!('expected' in result.evidence)) throw new Error('Expected a Vitest specification result');
+
+        const [expected] = result.evidence.expected;
+        expect(result.evidence.expected).toHaveLength(1);
+        expect(expected).toMatchObject({ file: testFile, kind: 'runtime' });
+        expect(result.evidence.observed).toMatchObject([
+          { id: expected?.id, file: testFile, cases: { passed: 0, failed, skipped, pending: 0 } },
+        ]);
+        if (failed) {
+          expect(result.evidence.observed[0]?.state).toBe('failed');
+        }
+      });
+    },
+    30_000,
+  );
+
+  it('retains passing tests and marks shutdown unverified when teardown is interrupted', async () => {
+    await withTempRepository('forge-vitest-interrupted-teardown-', async (repo) => {
+      await repo.linkNodeModules();
+      await repo.write(
+        'vitest.config.mjs',
+        `export default {
+          test: { maxWorkers: 1, globalSetup: ['./global-setup.mjs'], teardownTimeout: 500 }
+        };`,
+      );
+      await repo.write(
+        'global-setup.mjs',
+        `import { appendFileSync } from 'node:fs';
+         export default function setup() {
+           return async () => {
+             appendFileSync('teardown.log', 'started\\n');
+             await new Promise(resolve => setTimeout(resolve, 4000));
+             appendFileSync('teardown.log', 'completed\\n');
+           };
+         }`,
+      );
+      const testFile = 'tests/Shutdown.test.ts';
+      await repo.write(testFile, `import { test } from 'vitest'; test('passes before teardown', () => {});`);
+
+      const result = await createVitestRunner().run([testFile], repo.root);
+
+      // The fixture records its own progress independently of the worker's shutdown marker.
+      expect(await readFile(repo.path('teardown.log'), 'utf8')).toBe('started\n');
+      expect(result).toMatchObject({
+        exitCode: 0,
+        shutdown: 'unverified',
+        evidence: {
+          status: 'complete',
+          expected: [{ file: testFile, kind: 'runtime' }],
+          observed: [{ file: testFile, state: 'passed', cases: { passed: 1, failed: 0, skipped: 0, pending: 0 } }],
+        },
+      });
+    });
   }, 30_000);
 
   it('preserves Vitest coverage threshold failures', async () => {
@@ -234,6 +363,29 @@ describe('Vitest runner integration', () => {
       const result = await runner.run(['packages/app/tests/Types.test.ts'], repoRoot);
 
       expect(result.exitCode).toBe(1);
+      expect(result.evidence).toMatchObject({ status: 'complete' });
+      if (!('expected' in result.evidence)) throw new Error('Expected a Vitest specification result');
+
+      const { expected, observed } = result.evidence;
+      expect(expected).toHaveLength(2);
+      expect(observed).toHaveLength(2);
+      expect(new Set(expected.map(({ id }) => id)).size).toBe(2);
+
+      const outcomes = expected.map(({ id, file, kind }) => ({
+        file,
+        kind,
+        state: observed.find((specification) => specification.id === id)?.state,
+      }));
+      expect(outcomes).toEqual(
+        expect.arrayContaining([
+          { file: 'tests/Types.test.ts', kind: 'runtime', state: 'passed' },
+          { file: 'tests/Types.test.ts', kind: 'typecheck', state: 'failed' },
+        ]),
+      );
+
+      // The compiler reports a module-level error even though no individual case failed.
+      const typecheck = expected.find(({ kind }) => kind === 'typecheck');
+      expect(observed.find(({ id }) => id === typecheck?.id)).toMatchObject({ cases: { failed: 0 } });
     } finally {
       await rm(repoRoot, { recursive: true });
     }
