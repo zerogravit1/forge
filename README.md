@@ -36,6 +36,8 @@ Dependency graphs are scoped to their originating test roots. This allows the sa
 
 When local imports, path aliases, or nonliteral dynamic imports cannot be resolved, Forge preserves that uncertainty rather than silently discarding the dependency. Node.js built-in modules and dependencies outside the repository are excluded from local dependency tracking.
 
+Subprocess entry points passed as file paths, such as Forge's Vitest worker, are outside the current import analysis. The `run` command blocks execution when the resulting selection has unmapped changes.
+
 **Validation:** Regression tests verify dependency selection, project isolation, and execution through Vitest, including propagation of failing assertions as nonzero validation results.
 
 See [#14 — TypeScript path alias resolution](https://github.com/zerogravit1/forge/issues/14) and [PR #23](https://github.com/zerogravit1/forge/pull/23) for implementation details and regression evidence.
@@ -48,7 +50,9 @@ The current implementation includes a CLI with `plan` and `run` commands, config
 
 Java and Maven integrations also exist but have known limitations.
 
-Some TypeScript dependency patterns, including dynamic imports and project path aliases, are not yet handled correctly. These limitations are tracked in GitHub issues.
+Dynamic imports and project path aliases have regression coverage and are supported in the current TypeScript workflow. Known Java/Maven correctness limitations remain tracked in issues [#11](https://github.com/zerogravit1/forge/issues/11), [#12](https://github.com/zerogravit1/forge/issues/12), [#15](https://github.com/zerogravit1/forge/issues/15), and [#16](https://github.com/zerogravit1/forge/issues/16).
+
+The Vitest runner reconciles specification outcomes internally and records shutdown completion alongside process status. Portable `plan` and `run` evidence artifacts are proposed under [#26](https://github.com/zerogravit1/forge/issues/26). [Vitest execution evidence](https://github.com/zerogravit1/forge/pull/28)
 
 Forge is not yet packaged for general installation. The current workflow is intended for repository development and validation while the TypeScript MVP is completed.
 
