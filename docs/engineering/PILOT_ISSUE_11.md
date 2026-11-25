@@ -15,6 +15,7 @@ Fix [Forge #11: Java test discovery ignores configured directories](https://gith
 Inspect and change only the code and tests needed to make Java test discovery honor configured test roots.
 
 Start with:
+
 - `src/discovery/java-test-files.ts` — currently hardcodes `src/test/java`.
 - `src/validation/create-validation-targets.ts` — currently does not pass the resolved `testRoots` to Java discovery.
 - `src/regressions/java-targets.regression.test.ts` — contains the quarantined #11 regression.

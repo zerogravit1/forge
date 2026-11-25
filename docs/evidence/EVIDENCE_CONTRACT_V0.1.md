@@ -5,6 +5,7 @@
 ## Product goal
 
 A developer or CI system should be able to inspect one portable JSON artifact to determine:
+
 1. What changed and which project/target configuration was evaluated.
 2. Which tests were discovered, selected, excluded, or left uncertain—and why.
 3. Which intended tests actually executed, their outcomes, and any missing execution proof.
@@ -40,17 +41,31 @@ The contract must not depend on Launchpad, Docker, Kubernetes, a database, a bro
   "analysis": {
     "status": "complete",
     "unmatchedChanges": [],
-    "targets": [{
-      "id": "example.vitest",
-      "runner": "vitest",
-      "discoveredTests": ["src/static.test.ts", "src/dynamic.test.ts", "src/unrelated.test.ts"],
-      "decisions": [
-        { "test": "src/static.test.ts", "decision": "selected", "reasons": [{ "kind": "dependency-path", "path": ["src/static.test.ts", "src/value.ts"] }] },
-        { "test": "src/dynamic.test.ts", "decision": "selected", "reasons": [{ "kind": "dependency-path", "path": ["src/dynamic.test.ts", "src/value.ts"] }] },
-        { "test": "src/unrelated.test.ts", "decision": "excluded", "reasons": [{ "kind": "known-no-impact", "path": ["src/unrelated.test.ts", "src/other.ts"] }] }
-      ],
-      "unresolved": []
-    }]
+    "targets": [
+      {
+        "id": "example.vitest",
+        "runner": "vitest",
+        "discoveredTests": ["src/static.test.ts", "src/dynamic.test.ts", "src/unrelated.test.ts"],
+        "decisions": [
+          {
+            "test": "src/static.test.ts",
+            "decision": "selected",
+            "reasons": [{ "kind": "dependency-path", "path": ["src/static.test.ts", "src/value.ts"] }]
+          },
+          {
+            "test": "src/dynamic.test.ts",
+            "decision": "selected",
+            "reasons": [{ "kind": "dependency-path", "path": ["src/dynamic.test.ts", "src/value.ts"] }]
+          },
+          {
+            "test": "src/unrelated.test.ts",
+            "decision": "excluded",
+            "reasons": [{ "kind": "known-no-impact", "path": ["src/unrelated.test.ts", "src/other.ts"] }]
+          }
+        ],
+        "unresolved": []
+      }
+    ]
   },
   "execution": { "status": "not-run", "targets": [] },
   "summary": {
