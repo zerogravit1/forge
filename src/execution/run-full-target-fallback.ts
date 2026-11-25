@@ -32,13 +32,15 @@ export async function runFullTargetFallback(plan: TargetPlan, repoRoot: string):
   writeList('Fallback test files', discoveredTests);
 
   // The shared runner result only requires a normalized exit code. Use the private Vitest
-  // observations, shutdown status, and subprocess termination when available.
+  // observations, shutdown status, and subprocess details when available.
   const result: ExecutionResults & {
     evidence?: VitestExecutionEvidence;
     shutdown?: VitestShutdownStatus;
     termination?: CommandResult['termination'];
+    stdinError?: CommandResult['stdinError'];
   } = await target.runner.run(discoveredTests, repoRoot);
-  const { evidence, shutdown, exitCode, termination } = result;
+  const { evidence, shutdown, exitCode, termination, stdinError } = result;
+  if (stdinError) console.error(`Vitest stdin write failed: ${stdinError.message}`);
   const evidenceStatus = evidence?.status ?? 'incomplete';
   const unavailableReason = evidence ? ('reason' in evidence ? evidence.reason : undefined) : 'unavailable';
   process.stdout.write(

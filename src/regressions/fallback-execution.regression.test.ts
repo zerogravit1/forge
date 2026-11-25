@@ -1,6 +1,7 @@
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { relative, resolve, sep } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { type TempRepository, withTempRepository } from '../helpers/temp-repo.js';
@@ -269,6 +270,88 @@ describe('Configured fallback execution', () => {
         }
         expect(await readFile(repo.path(project, 'teardown-started'), 'utf8')).toBe('started');
         expect(await readObservedCases(repo)).toEqual(expected);
+      });
+    },
+    60_000,
+  );
+
+  it.skipIf(process.platform === 'win32')(
+    'reports both a manifest write failure and the early worker termination',
+    async () => {
+      await withTempRepository('forge-fallback-early-signal-', async (repo) => {
+        await writeFixture(repo, { fullTarget: true, failExtra: false, skipCase: false });
+        const worker = resolve('src/execution/vitest-worker.ts');
+        const preload = pathToFileURL(repo.path('interrupt-worker.mjs'));
+        await repo.write(
+          'interrupt-worker.mjs',
+          `if (process.argv[1] === ${JSON.stringify(worker)}) process.kill(process.pid, 'SIGTERM');`,
+        );
+        const env = {
+          ...process.env,
+          NODE_OPTIONS: [process.env.NODE_OPTIONS, `--import=${preload.href}`].filter(Boolean).join(' '),
+        };
+        // Keep the manifest larger than the stdin pipe. Inject the inventory to exercise the real
+        // runner and fallback report without adding thousands of files to the discovery fixture.
+        const testFiles = Array.from({ length: 4096 }, (_, index) => `tests/${'section/'.repeat(20)}${index}.test.ts`);
+        const manifest = JSON.stringify({ testFiles });
+        const native = spawn(process.execPath, [worker], {
+          cwd: repo.path(project),
+          env,
+          stdio: ['pipe', 'ignore', 'ignore'],
+          timeout: 20_000,
+          killSignal: 'SIGKILL',
+        });
+        const nativeTermination = new Promise((resolve, reject) => {
+          native.on('error', reject);
+          native.on('close', (exitCode, signal) => resolve({ exitCode, signal }));
+        });
+        const nativeWrite = new Promise<Error | undefined>((resolve) => {
+          native.stdin.on('error', resolve);
+          native.stdin.on('close', () => resolve(undefined));
+        });
+        native.stdin.end(manifest);
+        const [termination, writeError] = await Promise.all([nativeTermination, nativeWrite]);
+        expect(termination).toEqual({ exitCode: null, signal: 'SIGTERM' });
+        expect(writeError).toMatchObject({ code: 'EPIPE' });
+
+        await repo.write('inventory.json', manifest);
+        await repo.write(
+          'run-fallback.mjs',
+          `import { readFile } from 'node:fs/promises';
+           import { main } from ${JSON.stringify(pathToFileURL(resolve('src/cli.ts')).href)};
+           import { createVitestRunner } from ${JSON.stringify(pathToFileURL(resolve('src/execution/vitest-runner.ts')).href)};
+           const { testFiles } = JSON.parse(await readFile('inventory.json', 'utf8'));
+           process.exitCode = await main(['run'], async () => [{ path: '${project}/src/unmapped.ts', status: 'modified' }], {
+             targets: [{
+               id: 'apps.tests', onUnmappedChanges: 'full-target', includesChange: () => true,
+               discoverTestFiles: async () => testFiles.map((file) => '${project}/' + file),
+               planSelection: async (unmappedChanges) => ({ selectedTests: [], unmappedChanges }),
+               runner: createVitestRunner('${project}'),
+             }],
+           });`,
+        );
+        const result = spawnSync(process.execPath, ['--import', 'tsx', repo.path('run-fallback.mjs')], {
+          cwd: repo.root,
+          env,
+          encoding: 'utf8',
+          timeout: 20_000,
+        });
+        expect(result.error).toBeUndefined();
+        expect(result.signal).toBeNull();
+        expect(result.status, result.stderr).toBe(1);
+        expect(result.stderr).toContain('Vitest stdin write failed: write EPIPE');
+        // Omit the large inventory from assertion diagnostics.
+        const report = result.stdout.split('\n').filter((line) => !line.startsWith('  '));
+        expect(report).toEqual(
+          expect.arrayContaining([
+            'Full-target fallback: apps.tests',
+            'Vitest execution evidence: incomplete (missing-result)',
+            'Vitest shutdown: unverified',
+            'Vitest subprocess signal: SIGTERM',
+            'Vitest runner exit: 1',
+          ]),
+        );
+        expect(report.some((line) => line.startsWith('Vitest subprocess exit:'))).toBe(false);
       });
     },
     60_000,

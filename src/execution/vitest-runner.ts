@@ -20,6 +20,7 @@ interface VitestRunner extends TestRunner {
       evidence: VitestExecutionEvidence;
       shutdown: VitestShutdownStatus;
       termination?: CommandResult['termination'];
+      stdinError?: CommandResult['stdinError'];
     }
   >;
 }

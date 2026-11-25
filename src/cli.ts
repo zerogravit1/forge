@@ -159,6 +159,7 @@ export async function main(
             executed = true;
 
             const result = await plan.target.runner.run(plan.selection.selectedTests, repoRoot);
+            if ('stdinError' in result && result.stdinError instanceof Error) throw result.stdinError;
 
             if (result.exitCode !== 0) {
               exitCode = 1;
@@ -187,6 +188,7 @@ export async function main(
 
         const runner = services.runner ?? createVitestRunner();
         const result = await runner.run(selection.selectedTests, repoRoot);
+        if ('stdinError' in result && result.stdinError instanceof Error) throw result.stdinError;
 
         return result.exitCode;
       }
