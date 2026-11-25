@@ -1,9 +1,10 @@
-import { stat } from 'node:fs/promises';
+import { stat, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import type { VitestEvidenceDestination, VitestObservation } from './vitest-evidence.js';
 
-async function readManifest(): Promise<string[]> {
+async function readManifest(): Promise<{ testFiles: string[]; evidence?: VitestEvidenceDestination }> {
   let input = '';
 
   for await (const chunk of process.stdin) {
@@ -23,7 +24,26 @@ async function readManifest(): Promise<string[]> {
     throw new Error('Invalid Vitest execution manifest');
   }
 
-  return parsed.testFiles as string[];
+  const testFiles = parsed.testFiles as string[];
+  if (!('evidence' in parsed)) {
+    return { testFiles };
+  }
+
+  const evidence = parsed.evidence;
+  if (
+    typeof evidence !== 'object' ||
+    evidence === null ||
+    !('resultFile' in evidence) ||
+    typeof evidence.resultFile !== 'string' ||
+    !isAbsolute(evidence.resultFile) ||
+    !('invocationId' in evidence) ||
+    typeof evidence.invocationId !== 'string' ||
+    evidence.invocationId.length === 0
+  ) {
+    throw new Error('Invalid Vitest evidence destination');
+  }
+
+  return { testFiles, evidence: { resultFile: evidence.resultFile, invocationId: evidence.invocationId } };
 }
 
 function resolveTestPath(projectRoot: string, file: string): string {
@@ -43,7 +63,7 @@ function resolveTestPath(projectRoot: string, file: string): string {
 
 async function main(): Promise<void> {
   const projectRoot = process.cwd();
-  const testFiles = await readManifest();
+  const { testFiles, evidence } = await readManifest();
 
   // Resolve Vitest from the target project, not from Forge.
   const projectRequire = createRequire(resolve(projectRoot, '__forge_vitest_resolver__.cjs'));
@@ -122,6 +142,41 @@ async function main(): Promise<void> {
 
     if (failed) {
       process.exitCode = process.exitCode || 1;
+    }
+
+    if (evidence) {
+      try {
+        const projectPath = (path: string) => relative(projectRoot, path).split(sep).join('/');
+        const observation: VitestObservation = {
+          invocationId: evidence.invocationId,
+          expected: specifications.map((spec) => ({
+            id: spec.taskId,
+            file: projectPath(spec.moduleId),
+            project: spec.project.name,
+            kind: spec.pool === 'typescript' ? 'typecheck' : 'runtime',
+          })),
+          observed: result.testModules.map((module) => {
+            const cases = { passed: 0, failed: 0, skipped: 0, pending: 0 };
+            for (const test of module.children.allTests()) {
+              cases[test.result().state]++;
+            }
+
+            return {
+              id: module.id,
+              file: projectPath(module.moduleId),
+              project: module.project.name,
+              state: module.state(),
+              cases,
+            };
+          }),
+          unhandledErrorCount: result.unhandledErrors.length,
+        };
+
+        // Vitest can force process exit during teardown. The parent reads this snapshot after exit.
+        await writeFile(evidence.resultFile, JSON.stringify(observation), { flag: 'wx' });
+      } catch (error: unknown) {
+        console.error('Unable to capture Vitest execution evidence', error);
+      }
     }
   } catch (error: unknown) {
     // Preserve execution failures before Vitest can terminate

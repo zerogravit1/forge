@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -152,9 +152,13 @@ describe('Vitest worker integration', () => {
       expect(`${direct.stdout}\n${direct.stderr}`).toMatch(/1 passed/);
 
       // Forge must also complete and exit without external termination.
+      const resultFile = join(projectRoot, 'forge-observation.json');
       const worker = spawnSync(process.execPath, [workerPath], {
         cwd: projectRoot,
-        input: JSON.stringify({ testFiles: ['tests/App.test.ts'] }),
+        input: JSON.stringify({
+          testFiles: ['tests/App.test.ts'],
+          evidence: { resultFile, invocationId: 'bounded-shutdown' },
+        }),
         encoding: 'utf8',
         timeout: 5000,
         killSignal: 'SIGKILL',
@@ -163,6 +167,12 @@ describe('Vitest worker integration', () => {
       expect(worker.error).toBeUndefined();
       expect(worker.status).toBe(0);
       expect(`${worker.stdout}\n${worker.stderr}`).toMatch(/1 passed/);
+      const observation: unknown = JSON.parse(await readFile(resultFile, 'utf8'));
+      expect(observation).toMatchObject({
+        invocationId: 'bounded-shutdown',
+        expected: [{ file: 'tests/App.test.ts', kind: 'runtime' }],
+        observed: [{ file: 'tests/App.test.ts', state: 'passed', cases: { passed: 1 } }],
+      });
     } finally {
       await rm(projectRoot, { recursive: true });
     }
