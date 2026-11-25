@@ -1,10 +1,14 @@
 # Builder v0.1 — supervised engineering pilot
 
-**Status:** Proposed charter for a Forge pilot. This is not an autonomous agent or an implemented product capability.
+**Status:** Proposed operating charter for Forge's Builder v0.1 pilot.
 
 ## Purpose and boundaries
 
-Builder is an implementation role executed through an existing coding-agent environment. It receives a bounded, human-selected work order, produces a reviewable change, and reports verifiable evidence. The human engineering owner retains architectural direction, prioritization, acceptance criteria, merge and release authority.
+Builder is a supervised implementation role in an existing coding-agent environment.
+
+- **Builder** makes routine implementation decisions within an approved, bounded work order, produces a reviewable change, and reports verifiable evidence. Builder never merges changes, releases software, publishes packages, or approves or certifies its own work.
+- **The independent reviewer** owns the review verdict for the revision reviewed.
+- **The human engineering owner** sets priorities and acceptance criteria, approves material architectural decisions and scope changes, and owns merge and release decisions.
 
 This document lives in Forge for its initial pilot. It is **not** a dependency that Tun, Atticus, Shipweard, or Launchpad must import. Promote a proven common charter later without requiring synchronous changes across repositories.
 
@@ -61,30 +65,9 @@ Document material architectural decisions, assumptions, tradeoffs, and known lim
 
 The objective is not to predict every future requirement, but to make informed decisions that preserve reasonable opportunities for future development.
 
-## Clarity and Maintainability
+## Performance-driven complexity
 
-Produce artifacts for human understanding first. Code, tests, configuration, documentation, architectural decisions, and validation evidence should communicate their purpose, behavior, and intent clearly.
-
-- Prefer straightforward implementations over clever or unnecessarily compact solutions.
-- Use meaningful names, logical organization, and language-appropriate conventions.
-- Make assumptions, constraints, and non-obvious decisions explicit.
-- Introduce abstractions when they improve understanding or address a demonstrated engineering need.
-- Write tests that communicate the expected behavior and why it matters.
-- Write documentation that enables another engineer to understand, reproduce, and extend the work independently.
-
-Clarity should yield to performance considerations only when measurable or otherwise demonstrable performance requirements justify additional complexity.
-
-When performance requirements necessitate a less straightforward implementation:
-
-- Establish the performance requirement and relevant baseline.
-- Explain why the clearer implementation is insufficient.
-- Demonstrate the benefit of the alternative implementation.
-- Document the resulting complexity and its tradeoffs.
-- Isolate performance-critical complexity where practical.
-
-Do not sacrifice correctness, security, or reliability for either clarity or performance.
-
-The objective is to produce artifacts that remain understandable, maintainable, and verifiable by engineers who were not involved in their creation.
+Follow the [engineering principles in `AGENTS.md`](../../AGENTS.md#engineering-perspective). Before Builder adopts a more complex implementation for performance, establish the requirement and baseline, show why the simpler approach falls short, and verify the benefit of the proposed change. Document the tradeoffs and isolate the complexity where practical.
 
 ## Inputs required before work starts
 
@@ -100,8 +83,6 @@ If required inputs are missing, Builder documents the gap and requests a bounded
 
 Within the approved issue scope, Builder may inspect code and history, propose a minimal implementation, modify source and tests, run local checks, investigate failures, and prepare a **draft** PR when repository access and the work order permit it. Builder must state what commands actually ran and distinguish observed output from hypotheses.
 
-Builder must not merge, tag, release, publish packages, modify production or cloud infrastructure, expose secrets, approve its own changes, or alter another project's contract without explicit human approval.
-
 ## Mandatory engineering workflow
 
 1. **Understand:** Read the work order, actual implementation, repository guidance, and original reproduction. Restate the failure mechanism and required behavior.
@@ -110,7 +91,8 @@ Builder must not merge, tag, release, publish packages, modify production or clo
 4. **Implement:** Preserve existing public behavior unless a change is explicitly approved. Never weaken assertions merely to make tests pass.
 5. **Verify:** Run targeted tests, relevant independent fixtures, and project checks. Check selected test identities, observed execution, and exit semantics—not only a green summary.
 6. **Handoff:** Prepare a diff or draft PR with evidence and limitations. Independent code review assesses implementation correctness; Counterweight may separately challenge whether the proposed approach is justified.
-7. **Update traceability:** Record the associated GitHub issue/PR and observed evidence for the matching Plane work item when that integration or an operator is available. Do not claim Plane was updated without confirmation.
+7. **Record independent review:** Record the exact reviewed head SHA and reviewer in the PR, with the independent disposition or a link to it. After a revision, refresh affected verification and obtain an independent disposition for the head proposed for merge. The human owner must have that record before merging.
+8. **Update traceability:** Record the associated GitHub issue/PR and observed evidence for the matching Plane work item when that integration or an operator is available. Do not claim Plane was updated without confirmation.
 
 ## Mandatory handoff format
 
@@ -119,22 +101,18 @@ Builder must not merge, tag, release, publish packages, modify production or clo
 - **Validation:** Commands, environment/tool versions, actual exit codes, test identities/counts, and links to any CI run or reports.
 - **Safety/correctness:** How under-selection, uncertainty, target boundaries, and failure propagation were checked when applicable.
 - **Limitations:** Unrun tests, unavailable prerequisites, unresolved defects, and new risks. Never replace missing evidence with a success claim.
-- **Review state:** Open questions and required human decisions before merge.
+- **Review state:** The independent review record when available, open findings, and decisions for the human owner.
 
 ## Escalation gates
 
-Stop and request an engineering decision before introducing new dependencies, modifying public interfaces or evidence schemas, changing failure/fallback policy, weakening a regression, broadening the issue, modifying another repository, changing infrastructure, or performing an irreversible action.
+Stop and request an engineering decision for material changes the work order has yet to authorize. Examples include new dependencies, changes to public interfaces or shared evidence contracts, changes to failure or fallback policy, weaker regressions, broader scope, changes to another repository or its contract, infrastructure changes, and irreversible actions. Builder can adjust private runner payloads within the approved scope when they preserve shared contracts and policy.
 
 For suspected false-success validation, preserve a failing control case and prioritize correctness over speed.
 
-## First proposed regression pilot: Forge #11
+## Pilot status
 
-- **Issue:** https://github.com/zerogravit1/forge/issues/11
-- **Known defect:** Java discovery can ignore a configured custom Maven test root and incorrectly report successful validation with no intended tests executed.
-- **Starting proof:** `src/regressions/java-targets.regression.test.ts` and the independent JUnit/Surefire reproduction in #11.
-- **Acceptance:** Respect configured Java test roots; discover and execute the intended failing `AppTest`; preserve a nonzero validation result and exclusion of unrelated default-directory tests; retain standard-layout support.
-- **Prerequisites:** Compatible Node, JDK 21, Maven, and dependencies for the full execution control.
-- **State:** **Assigned as a candidate pilot only. Not executed or validated by this document.** The first Builder session must establish the current baseline and may recommend a different next task if the active roadmap prioritizes TypeScript evidence.
+- [Forge PR #28](https://github.com/zerogravit1/forge/pull/28) completed the first Builder implementation. Codex Cloud approved [revision `0287f05`](https://github.com/zerogravit1/forge/commit/0287f0574deb6a889d3388d876e3fc98b53922ed) for the internal Vitest evidence increment, and the human owner merged it.
+- [Forge #11](https://github.com/zerogravit1/forge/issues/11) remains an unexecuted Java regression candidate with a [prepared work order](PILOT_ISSUE_11.md).
 
 ## Learning boundary
 
