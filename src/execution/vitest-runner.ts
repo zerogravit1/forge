@@ -4,10 +4,18 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve, relative, isAbsolute, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readVitestEvidence, type VitestExecutionEvidence } from './vitest-evidence.js';
+import {
+  readVitestEvidence,
+  readVitestShutdown,
+  type VitestExecutionEvidence,
+  type VitestShutdownStatus,
+} from './vitest-evidence.js';
 
 interface VitestRunner extends TestRunner {
-  run(testFiles: string[], repoRoot: string): Promise<ExecutionResults & { evidence: VitestExecutionEvidence }>;
+  run(
+    testFiles: string[],
+    repoRoot: string,
+  ): Promise<ExecutionResults & { evidence: VitestExecutionEvidence; shutdown: VitestShutdownStatus }>;
 }
 
 export function createVitestRunner(projectRoot = '.', execute: typeof runCommand = runCommand): VitestRunner {
@@ -50,6 +58,7 @@ export function createVitestRunner(projectRoot = '.', execute: typeof runCommand
       const directory = await mkdtemp(join(tmpdir(), 'forge-vitest-evidence-')).catch(() => undefined);
       const destination = directory && {
         resultFile: join(directory, 'result.json'),
+        shutdownFile: join(directory, 'shutdown'),
         invocationId: basename(directory),
       };
 
@@ -60,7 +69,8 @@ export function createVitestRunner(projectRoot = '.', execute: typeof runCommand
           ? await readVitestEvidence(destination, projectTestFiles)
           : { status: 'incomplete', reason: 'missing-result' };
 
-        return { exitCode, evidence };
+        const shutdown = destination ? await readVitestShutdown(destination) : 'unverified';
+        return { exitCode, evidence, shutdown };
       } finally {
         if (directory) {
           await rm(directory, { recursive: true, force: true }).catch(() => undefined);

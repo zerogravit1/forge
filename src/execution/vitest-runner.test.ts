@@ -12,7 +12,7 @@ function readManifest(input: string | undefined) {
 
   return JSON.parse(input) as {
     testFiles: string[];
-    evidence: { resultFile: string; invocationId: string };
+    evidence: { resultFile: string; shutdownFile: string; invocationId: string };
   };
 }
 
@@ -54,7 +54,11 @@ describe('createVitestRunner', () => {
       expect.any(String),
     );
     expect(manifest.testFiles).toEqual(testCase.expectedFiles);
-    expect(result).toEqual({ exitCode: 0, evidence: { status: 'incomplete', reason: 'missing-result' } });
+    expect(result).toEqual({
+      exitCode: 0,
+      evidence: { status: 'incomplete', reason: 'missing-result' },
+      shutdown: 'unverified',
+    });
   });
 
   it('does not execute when no test files are provided', async () => {
@@ -65,25 +69,56 @@ describe('createVitestRunner', () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
-  it('preserves a nonzero exit even when the worker reports matching passing observations', async () => {
+  it.each([
+    { marker: 'matching', markerId: (id: string) => id, shutdown: 'completed' },
+    { marker: 'stale', markerId: (id: string) => `previous-${id}`, shutdown: 'unverified' },
+  ])(
+    'preserves a nonzero exit and passing observations with a $marker shutdown marker',
+    async ({ markerId, shutdown }) => {
+      const execute = vi.fn<typeof runCommand>(async (_command, _args, _cwd, input) => {
+        const { evidence } = readManifest(input);
+        await writeFile(evidence.resultFile, JSON.stringify(passingReport(evidence.invocationId)));
+        await writeFile(evidence.shutdownFile, markerId(evidence.invocationId));
+        return 1;
+      });
+      const runner = createVitestRunner('.', execute);
+
+      const result = await runner.run(['tests/App.test.ts'], process.cwd());
+      const { evidence } = readManifest(execute.mock.calls[0]?.[3]);
+      const report = passingReport(evidence.invocationId);
+
+      expect(result).toMatchObject({
+        exitCode: 1,
+        shutdown,
+        evidence: { status: 'complete', expected: report.expected, observed: report.observed },
+      });
+      await expect(access(evidence.resultFile)).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(access(evidence.shutdownFile)).rejects.toMatchObject({ code: 'ENOENT' });
+    },
+  );
+
+  it('retains contradictory outcomes as incomplete despite a completed shutdown and zero exit', async () => {
     const execute = vi.fn<typeof runCommand>(async (_command, _args, _cwd, input) => {
       const { evidence } = readManifest(input);
-      await writeFile(evidence.resultFile, JSON.stringify(passingReport(evidence.invocationId)));
-      return 1;
+      const report = passingReport(evidence.invocationId);
+      report.observed[0].cases.failed = 1;
+      await writeFile(evidence.resultFile, JSON.stringify(report));
+      await writeFile(evidence.shutdownFile, evidence.invocationId);
+      return 0;
     });
     const runner = createVitestRunner('.', execute);
 
     const result = await runner.run(['tests/App.test.ts'], process.cwd());
-    const { evidence } = readManifest(execute.mock.calls[0]?.[3]);
-    const report = passingReport(evidence.invocationId);
 
-    expect(result.exitCode).toBe(1);
-    expect(result.evidence).toMatchObject({
-      status: 'complete',
-      expected: report.expected,
-      observed: report.observed,
+    expect(result).toMatchObject({
+      exitCode: 0,
+      shutdown: 'completed',
+      evidence: {
+        status: 'incomplete',
+        observed: [{ id: 'app-runtime-specification', state: 'passed', cases: { passed: 1, failed: 1 } }],
+        unverifiedSpecifications: ['app-runtime-specification'],
+      },
     });
-    await expect(access(evidence.resultFile)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
   it('retains the missing specification when the worker reports no observed modules', async () => {
@@ -148,7 +183,7 @@ describe('createVitestRunner', () => {
     const result = await runner.run(['packages/app/tests/App.test.ts'], process.cwd());
     const { evidence } = readManifest(execute.mock.calls[0]?.[3]);
 
-    expect(result).toEqual({ exitCode: 0, evidence: { status: 'incomplete', reason } });
+    expect(result).toEqual({ exitCode: 0, evidence: { status: 'incomplete', reason }, shutdown: 'unverified' });
     await expect(access(evidence.resultFile)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 

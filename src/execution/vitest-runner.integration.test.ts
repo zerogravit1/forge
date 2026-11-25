@@ -63,6 +63,7 @@ describe('Vitest runner integration', () => {
       const result = await runner.run(selectedTests, repoRoot);
 
       expect.soft(result.exitCode).toBe(0);
+      expect(result.shutdown).toBe('completed');
       expect(result.evidence).toMatchObject({ status: 'complete', unhandledErrorCount: 0 });
       if (!('expected' in result.evidence)) throw new Error('Expected a Vitest specification result');
 
@@ -172,6 +173,45 @@ describe('Vitest runner integration', () => {
     },
     30_000,
   );
+
+  it('retains passing tests and marks shutdown unverified when teardown is interrupted', async () => {
+    await withTempRepository('forge-vitest-interrupted-teardown-', async (repo) => {
+      await repo.linkNodeModules();
+      await repo.write(
+        'vitest.config.mjs',
+        `export default {
+          test: { maxWorkers: 1, globalSetup: ['./global-setup.mjs'], teardownTimeout: 500 }
+        };`,
+      );
+      await repo.write(
+        'global-setup.mjs',
+        `import { appendFileSync } from 'node:fs';
+         export default function setup() {
+           return async () => {
+             appendFileSync('teardown.log', 'started\\n');
+             await new Promise(resolve => setTimeout(resolve, 4000));
+             appendFileSync('teardown.log', 'completed\\n');
+           };
+         }`,
+      );
+      const testFile = 'tests/Shutdown.test.ts';
+      await repo.write(testFile, `import { test } from 'vitest'; test('passes before teardown', () => {});`);
+
+      const result = await createVitestRunner().run([testFile], repo.root);
+
+      // The fixture records its own progress independently of the worker's shutdown marker.
+      expect(await readFile(repo.path('teardown.log'), 'utf8')).toBe('started\n');
+      expect(result).toMatchObject({
+        exitCode: 0,
+        shutdown: 'unverified',
+        evidence: {
+          status: 'complete',
+          expected: [{ file: testFile, kind: 'runtime' }],
+          observed: [{ file: testFile, state: 'passed', cases: { passed: 1, failed: 0, skipped: 0, pending: 0 } }],
+        },
+      });
+    });
+  }, 30_000);
 
   it('preserves Vitest coverage threshold failures', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'forge-vitest-coverage-'));
@@ -342,6 +382,10 @@ describe('Vitest runner integration', () => {
           { file: 'tests/Types.test.ts', kind: 'typecheck', state: 'failed' },
         ]),
       );
+
+      // The compiler reports a module-level error even though no individual case failed.
+      const typecheck = expected.find(({ kind }) => kind === 'typecheck');
+      expect(observed.find(({ id }) => id === typecheck?.id)).toMatchObject({ cases: { failed: 0 } });
     } finally {
       await rm(repoRoot, { recursive: true });
     }

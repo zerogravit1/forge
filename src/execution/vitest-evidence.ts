@@ -3,8 +3,12 @@ import { reconcileSpecifications } from './vitest-results.js';
 
 export interface VitestEvidenceDestination {
   resultFile: string;
+  shutdownFile: string;
   invocationId: string;
 }
+
+// Completion means Vitest's close sequence returned. Its errors and subprocess status are separate.
+export type VitestShutdownStatus = 'completed' | 'unverified';
 
 interface SpecificationIdentity {
   id: string;
@@ -108,6 +112,8 @@ export async function readVitestEvidence(
     return { status: 'incomplete', reason: 'wrong-scope' };
   }
 
+  // Forge sets the selected paths. The worker's Vitest discovery is trusted to map
+  // those paths to projects. The parent checks observations against that inventory.
   for (const module of observed) {
     const spec = expectedById.get(module.id);
     if (!selectedFiles.has(module.file) || (spec && (module.file !== spec.file || module.project !== spec.project))) {
@@ -125,7 +131,8 @@ export async function readVitestEvidence(
       const isRuntime = expectedById.get(module.id)?.kind === 'runtime';
       // A runtime module can look passed even when every case was skipped.
       const noRuntimeCasesFinished = isRuntime && module.cases.passed === 0 && module.cases.failed === 0;
-      return module.state === 'skipped' || module.cases.pending > 0 || noRuntimeCasesFinished;
+      const contradictoryPass = module.state === 'passed' && module.cases.failed > 0;
+      return module.state === 'skipped' || module.cases.pending > 0 || noRuntimeCasesFinished || contradictoryPass;
     })
     .map((module) => module.id);
 
@@ -139,4 +146,13 @@ export async function readVitestEvidence(
     reconciliation,
     unverifiedSpecifications,
   };
+}
+
+export async function readVitestShutdown(destination: VitestEvidenceDestination): Promise<VitestShutdownStatus> {
+  try {
+    const marker = await readFile(destination.shutdownFile, 'utf8');
+    return marker === destination.invocationId ? 'completed' : 'unverified';
+  } catch {
+    return 'unverified';
+  }
 }

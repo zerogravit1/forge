@@ -102,7 +102,7 @@ describe('Vitest worker integration', () => {
     }
   }, 30_000);
 
-  it('terminates within the configured teardown timeout', async () => {
+  it('records completed shutdown before a lingering handle triggers the exit timeout', async () => {
     const projectRoot = await mkdtemp(join(tmpdir(), 'forge-vitest-shutdown-'));
     const workerPath = fileURLToPath(new URL('./vitest-worker.ts', import.meta.url));
 
@@ -116,7 +116,7 @@ describe('Vitest worker integration', () => {
           test: {
             include: ['tests/**/*.test.ts'],
             globalSetup: ['./global-setup.mjs'],
-            teardownTimeout: 300,
+            teardownTimeout: 900,
             maxWorkers: 1
           }
         };`,
@@ -124,8 +124,13 @@ describe('Vitest worker integration', () => {
 
       await writeFile(
         join(projectRoot, 'global-setup.mjs'),
-        `export default function setup() {
+        `import { appendFileSync } from 'node:fs';
+        export default function setup() {
           setInterval(() => {}, 1000);
+          return () => {
+            appendFileSync('teardown.log', 'started\\n');
+            appendFileSync('teardown.log', 'completed\\n');
+          };
         }`,
       );
 
@@ -150,14 +155,19 @@ describe('Vitest worker integration', () => {
       expect(direct.error).toBeUndefined();
       expect(direct.status).not.toBeNull();
       expect(`${direct.stdout}\n${direct.stderr}`).toMatch(/1 passed/);
+      expect(direct.stderr).toContain('close timed out');
+      const teardownLog = join(projectRoot, 'teardown.log');
+      expect(await readFile(teardownLog, 'utf8')).toBe('started\ncompleted\n');
 
       // Forge must also complete and exit without external termination.
       const resultFile = join(projectRoot, 'forge-observation.json');
+      const shutdownFile = join(projectRoot, 'forge-shutdown.txt');
+      const invocationId = 'bounded-shutdown';
       const worker = spawnSync(process.execPath, [workerPath], {
         cwd: projectRoot,
         input: JSON.stringify({
           testFiles: ['tests/App.test.ts'],
-          evidence: { resultFile, invocationId: 'bounded-shutdown' },
+          evidence: { resultFile, shutdownFile, invocationId },
         }),
         encoding: 'utf8',
         timeout: 5000,
@@ -167,9 +177,12 @@ describe('Vitest worker integration', () => {
       expect(worker.error).toBeUndefined();
       expect(worker.status).toBe(0);
       expect(`${worker.stdout}\n${worker.stderr}`).toMatch(/1 passed/);
+      expect(worker.stderr).toContain('close timed out');
+      expect(await readFile(teardownLog, 'utf8')).toBe('started\ncompleted\nstarted\ncompleted\n');
+      expect(await readFile(shutdownFile, 'utf8')).toBe(invocationId);
       const observation: unknown = JSON.parse(await readFile(resultFile, 'utf8'));
       expect(observation).toMatchObject({
-        invocationId: 'bounded-shutdown',
+        invocationId,
         expected: [{ file: 'tests/App.test.ts', kind: 'runtime' }],
         observed: [{ file: 'tests/App.test.ts', state: 'passed', cases: { passed: 1 } }],
       });

@@ -1,3 +1,4 @@
+import { writeFileSync } from 'node:fs';
 import { stat, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
@@ -36,6 +37,9 @@ async function readManifest(): Promise<{ testFiles: string[]; evidence?: VitestE
     !('resultFile' in evidence) ||
     typeof evidence.resultFile !== 'string' ||
     !isAbsolute(evidence.resultFile) ||
+    !('shutdownFile' in evidence) ||
+    typeof evidence.shutdownFile !== 'string' ||
+    !isAbsolute(evidence.shutdownFile) ||
     !('invocationId' in evidence) ||
     typeof evidence.invocationId !== 'string' ||
     evidence.invocationId.length === 0
@@ -43,7 +47,8 @@ async function readManifest(): Promise<{ testFiles: string[]; evidence?: VitestE
     throw new Error('Invalid Vitest evidence destination');
   }
 
-  return { testFiles, evidence: { resultFile: evidence.resultFile, invocationId: evidence.invocationId } };
+  const { resultFile, shutdownFile, invocationId } = evidence;
+  return { testFiles, evidence: { resultFile, shutdownFile, invocationId } };
 }
 
 function resolveTestPath(projectRoot: string, file: string): string {
@@ -186,6 +191,15 @@ async function main(): Promise<void> {
     console.error(error instanceof Error ? (error.stack ?? error.message) : String(error));
   } finally {
     await vitest.exit();
+
+    if (evidence) {
+      try {
+        // Vitest's forced-exit timer can still fire after close returns.
+        writeFileSync(evidence.shutdownFile, evidence.invocationId, { flag: 'wx' });
+      } catch (error: unknown) {
+        console.error('Unable to record Vitest shutdown completion', error);
+      }
+    }
   }
 }
 
