@@ -779,7 +779,7 @@ describe('configured full-target fallback', () => {
       reconciliation: { missing: [], unexpected: [], duplicates: [], incomplete: [] },
       unverifiedSpecifications: [],
     };
-    const observed = { exitCode: 0, evidence, shutdown: 'completed' };
+    const observed = { exitCode: 0, termination: { exitCode: 0, signal: null }, evidence, shutdown: 'completed' };
     target.runner.run.mockResolvedValue(observed);
 
     const status = await main(['run'], async () => [workerChange], { targets: [target, unrelatedTarget] });
@@ -800,9 +800,50 @@ describe('configured full-target fallback', () => {
     );
     expect(output()).toContain('Vitest shutdown: completed');
     expect(output()).toContain('Vitest subprocess exit: 0');
+    expect(output()).toContain('Vitest runner exit: 0');
+    expect(output()).not.toContain('Vitest reconciliation:');
   });
 
-  it('keeps unavailable evidence and shutdown unverified even when the subprocess exits zero', async () => {
+  it('reports the missing typecheck specification alongside a passing runtime observation for the same file', async () => {
+    const output = captureOutput();
+    const target = createTarget('full-target', { files: [knownTest] });
+    const identity = { file: knownTest, project: 'internal' };
+    const evidence: VitestExecutionEvidence = {
+      status: 'incomplete',
+      expected: [
+        { ...identity, id: 'runtime-id', kind: 'runtime' },
+        { ...identity, id: 'typecheck-id', kind: 'typecheck' },
+      ],
+      observed: [
+        {
+          ...identity,
+          id: 'runtime-id',
+          state: 'passed',
+          cases: { passed: 1, failed: 0, skipped: 0, pending: 0 },
+        },
+      ],
+      unhandledErrorCount: 0,
+      reconciliation: { missing: ['typecheck-id'], unexpected: [], duplicates: [], incomplete: [] },
+      unverifiedSpecifications: [],
+    };
+    const result = { exitCode: 0, termination: { exitCode: 0, signal: null }, evidence, shutdown: 'completed' };
+    target.runner.run.mockResolvedValue(result);
+
+    const status = await main(['run'], async () => [workerChange], { targets: [target] });
+
+    expect(status).toBe(1);
+    expect(target.runner.run).toHaveBeenCalledExactlyOnceWith([knownTest], process.cwd());
+    expect(output()).toContain('Vitest execution evidence: incomplete');
+    expect(output()).toContain('runtime-id]: passed (1 passed, 0 failed, 0 skipped, 0 pending)');
+    expect(output()).toMatch(
+      /Vitest reconciliation:\s+missing: src\/known\.test\.ts \[internal, typecheck, typecheck-id\]/,
+    );
+    expect(output()).not.toMatch(/\n\s+(unexpected|duplicates|incomplete|unverified):/);
+    expect(output()).toContain('Vitest subprocess exit: 0');
+    expect(output()).toContain('Vitest runner exit: 0');
+  });
+
+  it('keeps unreported termination distinct from a zero runner result', async () => {
     const output = captureOutput();
     const target = createTarget('full-target');
 
@@ -812,7 +853,9 @@ describe('configured full-target fallback', () => {
     expect(target.runner.run).toHaveBeenCalledExactlyOnceWith(inventory, process.cwd());
     expect(output()).toContain('Vitest execution evidence: incomplete (unavailable)');
     expect(output()).toContain('Vitest shutdown: unverified');
-    expect(output()).toContain('Vitest subprocess exit: 0');
+    expect(output()).toContain('Vitest subprocess termination: unavailable');
+    expect(output()).not.toContain('Vitest subprocess exit:');
+    expect(output()).toContain('Vitest runner exit: 0');
   });
 
   it('uses ordinary selection when the opted-in target has no detected mapping gap', async () => {

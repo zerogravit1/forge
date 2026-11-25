@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { runCommand } from './command-runner.js';
+import { runCommand, runCommandWithTermination } from './command-runner.js';
 
 describe('runCommand', () => {
   it('resolves when the command exits successfully', async () => {
     await expect(runCommand(process.execPath, ['-e', 'process.exit(0)'])).resolves.toBe(0);
   });
 
-  it('rejects when the command exits unsuccessfully', async () => {
+  it('resolves with a nonzero exit code when the command fails', async () => {
     await expect(runCommand(process.execPath, ['-e', 'process.exit(1)'])).resolves.toBe(1);
   });
 
@@ -37,4 +37,25 @@ describe('runCommand', () => {
 
     expect(exitCode).toBe(0);
   });
+});
+
+describe('runCommandWithTermination', () => {
+  it.each([0, 1])('retains an observed numeric exit of %i', async (code) => {
+    await expect(runCommandWithTermination(process.execPath, ['-e', `process.exit(${code})`])).resolves.toEqual({
+      exitCode: code,
+      termination: { exitCode: code, signal: null },
+    });
+  });
+
+  it.skipIf(process.platform === 'win32')(
+    'retains signal termination while normalizing the runner result',
+    async () => {
+      const args = ['-e', "process.kill(process.pid, 'SIGKILL')"];
+      await expect(runCommandWithTermination(process.execPath, args)).resolves.toEqual({
+        exitCode: 1,
+        termination: { exitCode: null, signal: 'SIGKILL' },
+      });
+      await expect(runCommand(process.execPath, args)).resolves.toBe(1);
+    },
+  );
 });

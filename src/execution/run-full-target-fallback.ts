@@ -1,4 +1,5 @@
 import type { TargetPlan } from '../validation/plan-validation-targets.js';
+import type { CommandResult } from './command-runner.js';
 import type { ExecutionResults } from './test-runner.js';
 import type { VitestExecutionEvidence, VitestShutdownStatus } from './vitest-evidence.js';
 
@@ -30,11 +31,14 @@ export async function runFullTargetFallback(plan: TargetPlan, repoRoot: string):
   writeList('Originally selected test files', selection.selectedTests);
   writeList('Fallback test files', discoveredTests);
 
-  // The shared runner result only requires a subprocess exit code. Retain the private Vitest
-  // observations when available and report their absence independently of the process status.
-  const result: ExecutionResults & { evidence?: VitestExecutionEvidence; shutdown?: VitestShutdownStatus } =
-    await target.runner.run(discoveredTests, repoRoot);
-  const { evidence, shutdown, exitCode } = result;
+  // The shared runner result only requires a normalized exit code. Use the private Vitest
+  // observations, shutdown status, and subprocess termination when available.
+  const result: ExecutionResults & {
+    evidence?: VitestExecutionEvidence;
+    shutdown?: VitestShutdownStatus;
+    termination?: CommandResult['termination'];
+  } = await target.runner.run(discoveredTests, repoRoot);
+  const { evidence, shutdown, exitCode, termination } = result;
   const evidenceStatus = evidence?.status ?? 'incomplete';
   const unavailableReason = evidence ? ('reason' in evidence ? evidence.reason : undefined) : 'unavailable';
   process.stdout.write(
@@ -48,8 +52,34 @@ export async function runFullTargetFallback(plan: TargetPlan, repoRoot: string):
       return `${file} [${scope}]: ${state} (${counts})`;
     });
     writeList('Observed Vitest specifications (project-relative)', observations);
+
+    const expectedById = new Map(evidence.expected.map((spec) => [spec.id, spec]));
+    const groups = { ...evidence.reconciliation, unverified: evidence.unverifiedSpecifications };
+    const diagnostics: string[] = [];
+    for (const [reason, ids] of Object.entries(groups)) {
+      if (ids.length === 0) continue;
+
+      const names = ids.map((id) => {
+        const expected = expectedById.get(id);
+        if (!expected) return id;
+
+        const scope = [expected.project, expected.kind, id].filter(Boolean).join(', ');
+        return `${expected.file} [${scope}]`;
+      });
+      diagnostics.push(`${reason}: ${names.join(', ')}`);
+    }
+    if (diagnostics.length > 0) writeList('Vitest reconciliation', diagnostics);
+
     process.stdout.write(`Vitest unhandled errors: ${evidence.unhandledErrorCount}\n`);
   }
 
-  process.stdout.write(`Vitest shutdown: ${shutdown ?? 'unverified'}\nVitest subprocess exit: ${exitCode}\n`);
+  process.stdout.write(`Vitest shutdown: ${shutdown ?? 'unverified'}\n`);
+  if (termination?.signal) {
+    process.stdout.write(`Vitest subprocess signal: ${termination.signal}\n`);
+  } else if (typeof termination?.exitCode === 'number') {
+    process.stdout.write(`Vitest subprocess exit: ${termination.exitCode}\n`);
+  } else {
+    process.stdout.write('Vitest subprocess termination: unavailable\n');
+  }
+  process.stdout.write(`Vitest runner exit: ${exitCode}\n`);
 }

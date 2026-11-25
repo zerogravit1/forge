@@ -13,6 +13,7 @@ interface FixtureOptions {
   fullTarget: boolean;
   failExtra: boolean;
   skipCase: boolean;
+  signalDuringTeardown?: boolean;
 }
 
 async function writeFixture(repo: TempRepository, options: FixtureOptions) {
@@ -42,10 +43,21 @@ async function writeFixture(repo: TempRepository, options: FixtureOptions) {
         include: ['tests/**/*.test.ts', 'src/**/*.test.ts'],
         maxWorkers: 1,
         reporters: ['json'],
-        outputFile: '${reportFile}'
+        outputFile: '${reportFile}',
+        ${options.signalDuringTeardown ? "globalSetup: './terminate.mjs'," : ''}
       }
     };`,
   );
+  if (options.signalDuringTeardown) {
+    await repo.write(
+      `${project}/terminate.mjs`,
+      `import { writeFileSync } from 'node:fs';
+       export default () => () => {
+         writeFileSync(new URL('./teardown-started', import.meta.url), 'started');
+         process.kill(process.pid, 'SIGKILL');
+       };`,
+    );
+  }
   await repo.write(`${project}/src/mapped.ts`, 'export const mapped = 1;');
   await repo.write(`${project}/src/unmapped.ts`, 'export const unmapped = 1;');
   await repo.write(
@@ -185,6 +197,77 @@ describe('Configured fallback execution', () => {
         expect(output).toContain('Vitest shutdown: completed');
         expect(output).toContain(`Vitest subprocess exit: ${failExtra ? 1 : 0}`);
         if (skipCase) expect(output).toContain('0 passed, 0 failed, 1 skipped, 0 pending');
+        expect(await readObservedCases(repo)).toEqual(expected);
+      });
+    },
+    60_000,
+  );
+
+  it.skipIf(process.platform === 'win32')(
+    'reports signal termination separately from the normalized runner and Forge exits',
+    async () => {
+      const options = { fullTarget: true, failExtra: false, skipCase: false, signalDuringTeardown: true };
+      const expected = [
+        { file: 'tests/App.test.ts', title: 'mapped consumer', status: 'passed' },
+        { file: 'tests/Extra.test.ts', title: 'otherwise unselected test', status: 'passed' },
+        { file: 'tests/Skipped.test.ts', title: 'native skip control', status: 'passed' },
+      ];
+
+      // Observe Node's close outcome directly in a separate fixture before checking Forge's report.
+      await withTempRepository('forge-fallback-signal-native-', async (repo) => {
+        await writeFixture(repo, options);
+        await changeSources(repo);
+        const evidence = {
+          invocationId: 'signal-control',
+          resultFile: repo.path('observations.json'),
+          shutdownFile: repo.path('shutdown'),
+        };
+        const native = spawnSync(process.execPath, [resolve('src/execution/vitest-worker.ts')], {
+          cwd: repo.path(project),
+          input: JSON.stringify({ testFiles: intendedFiles, evidence }),
+          encoding: 'utf8',
+          timeout: 20_000,
+        });
+        expect(native.error).toBeUndefined();
+        expect(native.status, native.stdout + native.stderr).toBeNull();
+        expect(native.signal).toBe('SIGKILL');
+        expect(await readFile(repo.path(project, 'teardown-started'), 'utf8')).toBe('started');
+        expect(await readObservedCases(repo)).toEqual(expected);
+        const observation: unknown = JSON.parse(await readFile(evidence.resultFile, 'utf8'));
+        expect(observation).toMatchObject({
+          invocationId: 'signal-control',
+          observed: expect.arrayContaining(
+            intendedFiles.map((file) =>
+              expect.objectContaining({
+                file,
+                project: 'app',
+                state: 'passed',
+                cases: { passed: 1, failed: 0, skipped: 0, pending: 0 },
+              }),
+            ),
+          ),
+        });
+        expect(observation).toHaveProperty('observed.length', intendedFiles.length);
+        await expect(readFile(evidence.shutdownFile, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+      });
+
+      await withTempRepository('forge-fallback-signal-run-', async (repo) => {
+        await writeFixture(repo, options);
+        await makeComparison(repo);
+        const result = runForge(repo, 'run');
+        expect(result.signal).toBeNull();
+        expect(result.status, result.stdout + result.stderr).toBe(1);
+        expect(result.stdout).toContain('Full-target fallback: apps.tests');
+        expect(result.stdout).toContain('Selection incomplete: original test mapping remains incomplete.');
+        expect(result.stdout).toContain('Vitest execution evidence: complete');
+        expect(result.stdout).toContain('Vitest shutdown: unverified');
+        expect(result.stdout).toContain('Vitest subprocess signal: SIGKILL');
+        expect(result.stdout).not.toContain('Vitest subprocess exit:');
+        expect(result.stdout).toContain('Vitest runner exit: 1');
+        for (const file of intendedFiles) {
+          expect(result.stdout).toContain(`${file} [app, `);
+        }
+        expect(await readFile(repo.path(project, 'teardown-started'), 'utf8')).toBe('started');
         expect(await readObservedCases(repo)).toEqual(expected);
       });
     },
