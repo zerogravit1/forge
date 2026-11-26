@@ -1,9 +1,11 @@
 import type { GitChange } from '../changes/git-changes.js';
+import type { UnmappedChangesPolicy } from '../config/forge-config.js';
 import type { SelectionResult } from '../selection/select-tests.js';
 import type { TestRunner } from '../execution/test-runner.js';
 
 export interface ValidationTarget {
   readonly id: string;
+  readonly onUnmappedChanges?: UnmappedChangesPolicy;
 
   includesChange(change: GitChange): boolean;
 

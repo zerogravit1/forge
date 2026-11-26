@@ -36,6 +36,9 @@ describe('createValidationTargets', () => {
 
     expect(tsTarget).toBeDefined();
     expect(tsTarget?.runner.id).toBe('vitest');
+    expect(tsTarget?.onUnmappedChanges).toBe(
+      resolved.find((target) => target.id === 'internal.forge-tests')?.onUnmappedChanges,
+    );
 
     expect(
       tsTarget?.includesChange({

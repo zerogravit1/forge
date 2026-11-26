@@ -3,6 +3,7 @@ import { getGitChanges } from './changes/git-changes.js';
 import { discoverVitestTestFiles } from './discovery/vitest-test-files.js';
 import { planTestSelection } from './selection/plan-test-selection.js';
 import { createVitestRunner } from './execution/vitest-runner.js';
+import { runFullTargetFallback } from './execution/run-full-target-fallback.js';
 
 import type { TestRunner } from './execution/test-runner.js';
 import type { ValidationTarget } from './validation/validation-target.js';
@@ -131,8 +132,19 @@ export async function main(
             return 1;
           }
 
-          if (plans.some((plan) => plan.selection.unmappedChanges.length > 0)) {
-            console.error('Selection incomplete. Execution requires a fallback policy.');
+          const blockedPlan = plans.find((plan) => plan.selection.unmappedChanges.length > 0);
+          if (blockedPlan) {
+            if (blockedPlan.target.onUnmappedChanges !== 'full-target') {
+              console.error('Selection incomplete. Execution requires a fallback policy.');
+            } else if (plans.length !== 1) {
+              console.error('Full-target fallback refused: exactly one affected validation target is required.');
+            } else if (changes.some((change) => change.status === 'renamed')) {
+              console.error('Full-target fallback refused: renames require a known scope for both paths.');
+            } else {
+              await runFullTargetFallback(blockedPlan, repoRoot);
+            }
+
+            // Fallback execution cannot resolve the original selection gap.
             return 1;
           }
 
@@ -147,6 +159,7 @@ export async function main(
             executed = true;
 
             const result = await plan.target.runner.run(plan.selection.selectedTests, repoRoot);
+            if ('stdinError' in result && result.stdinError instanceof Error) throw result.stdinError;
 
             if (result.exitCode !== 0) {
               exitCode = 1;
@@ -175,6 +188,7 @@ export async function main(
 
         const runner = services.runner ?? createVitestRunner();
         const result = await runner.run(selection.selectedTests, repoRoot);
+        if ('stdinError' in result && result.stdinError instanceof Error) throw result.stdinError;
 
         return result.exitCode;
       }

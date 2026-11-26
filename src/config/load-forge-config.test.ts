@@ -54,4 +54,43 @@ describe('validateForgeConfig', () => {
 
     expect(() => validateForgeConfig(config)).toThrow('Invalid Forge configuration');
   });
+
+  const configurationWithExecution = (execution: unknown) => ({
+    version: '1.0.0',
+    roots: {},
+    adapters: {},
+    runners: {},
+    targets: {
+      internal: {
+        'forge-tests': {
+          root: 'internal.forge',
+          adapter: ['typescript'],
+          runner: ['vitest'],
+          execution,
+        },
+      },
+    },
+  });
+
+  it.each([{}, { onUnmappedChanges: 'strict' }, { onUnmappedChanges: 'full-target' }])(
+    'accepts target execution setting %j',
+    (execution) => {
+      const config = configurationWithExecution(execution);
+      expect(validateForgeConfig(config)).toEqual(config);
+    },
+  );
+
+  it.each([
+    [null],
+    [[]],
+    ['full-target'],
+    [{ onUnmappedChanges: 'whole-repository' }],
+    [{ onUnmappedChanges: false }],
+    [{ onUnmappedChanges: null }],
+    [{ onUnmappedChange: 'full-target' }],
+  ])('rejects invalid target execution setting %j', (execution) => {
+    expect(() => validateForgeConfig(configurationWithExecution(execution))).toThrow(
+      'Invalid Forge configuration: targets.internal.forge-tests.execution',
+    );
+  });
 });

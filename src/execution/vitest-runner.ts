@@ -1,5 +1,5 @@
 import type { ExecutionResults, TestRunner } from './test-runner.js';
-import { runCommand } from './command-runner.js';
+import { type CommandResult, runCommandWithTermination } from './command-runner.js';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve, relative, isAbsolute, sep } from 'node:path';
@@ -15,10 +15,22 @@ interface VitestRunner extends TestRunner {
   run(
     testFiles: string[],
     repoRoot: string,
-  ): Promise<ExecutionResults & { evidence: VitestExecutionEvidence; shutdown: VitestShutdownStatus }>;
+  ): Promise<
+    ExecutionResults & {
+      evidence: VitestExecutionEvidence;
+      shutdown: VitestShutdownStatus;
+      termination?: CommandResult['termination'];
+      stdinError?: CommandResult['stdinError'];
+    }
+  >;
 }
 
-export function createVitestRunner(projectRoot = '.', execute: typeof runCommand = runCommand): VitestRunner {
+export function createVitestRunner(
+  projectRoot = '.',
+  execute: (
+    ...args: Parameters<typeof runCommandWithTermination>
+  ) => Promise<number | CommandResult> = runCommandWithTermination,
+): VitestRunner {
   return {
     id: 'vitest',
 
@@ -64,13 +76,14 @@ export function createVitestRunner(projectRoot = '.', execute: typeof runCommand
 
       try {
         const manifest = JSON.stringify({ testFiles: projectTestFiles, evidence: destination });
-        const exitCode = await execute(process.execPath, [workerPath], projectDirectory, manifest);
+        const execution = await execute(process.execPath, [workerPath], projectDirectory, manifest);
+        const processResult = typeof execution === 'number' ? { exitCode: execution } : execution;
         const evidence: VitestExecutionEvidence = destination
           ? await readVitestEvidence(destination, projectTestFiles)
           : { status: 'incomplete', reason: 'missing-result' };
 
         const shutdown = destination ? await readVitestShutdown(destination) : 'unverified';
-        return { exitCode, evidence, shutdown };
+        return { ...processResult, evidence, shutdown };
       } finally {
         if (directory) {
           await rm(directory, { recursive: true, force: true }).catch(() => undefined);

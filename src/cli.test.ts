@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { main } from './cli.js';
+import type { GitChange } from './changes/git-changes.js';
+import type { TestRunner } from './execution/test-runner.js';
+import type { VitestExecutionEvidence } from './execution/vitest-evidence.js';
+import type { SelectionResult } from './selection/select-tests.js';
 import type { ValidationTarget } from './validation/validation-target.js';
 
 import * as configLoader from './config/load-forge-config.js';
@@ -711,5 +715,242 @@ describe('main', () => {
     expect(exitCode).toBe(1);
     expect(stderr).toHaveBeenCalledWith('Invalid Forge configuration');
     expect(getChanges).not.toHaveBeenCalled();
+  });
+});
+
+describe('configured full-target fallback', () => {
+  const knownTest = 'src/known.test.ts';
+  const additionalTest = 'src/additional.test.ts';
+  const inventory = [knownTest, additionalTest];
+  const workerChange: GitChange = { status: 'modified', path: 'src/worker.ts' };
+
+  function createTarget(
+    onUnmappedChanges: ValidationTarget['onUnmappedChanges'],
+    {
+      id = 'internal.forge-tests',
+      root = 'src/',
+      runnerId = 'vitest',
+      files = inventory,
+      selection = { selectedTests: [knownTest], unmappedChanges: [workerChange] },
+    }: { id?: string; root?: string; runnerId?: string; files?: string[]; selection?: SelectionResult } = {},
+  ) {
+    const run = vi.fn<TestRunner['run']>().mockResolvedValue({ exitCode: 0 });
+    return {
+      id,
+      ...(onUnmappedChanges === undefined ? {} : { onUnmappedChanges }),
+      includesChange: (change: GitChange) => change.path.startsWith(root),
+      discoverTestFiles: vi.fn(async () => files),
+      planSelection: vi.fn(async () => selection),
+      runner: { id: runnerId, run },
+    } satisfies ValidationTarget;
+  }
+
+  function captureOutput() {
+    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    const stderr = vi.spyOn(console, 'error').mockImplementation(() => {});
+    return () => [...stdout.mock.calls, ...stderr.mock.calls].map(([message]) => String(message)).join('\n');
+  }
+
+  it.each([undefined, 'strict'] as const)('preserves strict refusal with policy %s', async (policy) => {
+    const output = captureOutput();
+    const target = createTarget(policy);
+
+    const status = await main(['run'], async () => [workerChange], { targets: [target] });
+
+    expect(status).toBe(1);
+    expect(target.runner.run).not.toHaveBeenCalled();
+    expect(output()).toContain('Selection incomplete. Execution requires a fallback policy.');
+  });
+
+  it('retains the original selection and exit 1 when the sole affected target has verified passing observations', async () => {
+    const output = captureOutput();
+    const target = createTarget('full-target');
+    const unrelatedTarget = createTarget(undefined, { id: 'examples.java', root: 'examples/', runnerId: 'maven' });
+    const expected = inventory.map((file, index) => ({ id: `spec-${index}`, file, project: 'internal' }));
+    const evidence: VitestExecutionEvidence = {
+      status: 'complete',
+      expected: expected.map((spec) => ({ ...spec, kind: 'runtime' })),
+      observed: expected.map((spec) => ({
+        ...spec,
+        state: 'passed',
+        cases: { passed: 1, failed: 0, skipped: 0, pending: 0 },
+      })),
+      unhandledErrorCount: 0,
+      reconciliation: { missing: [], unexpected: [], duplicates: [], incomplete: [] },
+      unverifiedSpecifications: [],
+    };
+    const observed = { exitCode: 0, termination: { exitCode: 0, signal: null }, evidence, shutdown: 'completed' };
+    target.runner.run.mockResolvedValue(observed);
+
+    const status = await main(['run'], async () => [workerChange], { targets: [target, unrelatedTarget] });
+
+    expect(target.discoverTestFiles).toHaveBeenCalledExactlyOnceWith(process.cwd());
+    expect(target.runner.run).toHaveBeenCalledExactlyOnceWith(inventory, process.cwd());
+    expect(unrelatedTarget.discoverTestFiles).not.toHaveBeenCalled();
+    expect(unrelatedTarget.runner.run).not.toHaveBeenCalled();
+    expect(status).toBe(1);
+    expect(output()).toContain('Full-target fallback: internal.forge-tests');
+    expect(output()).toContain('Selection incomplete: original test mapping remains incomplete.');
+    expect(output()).toMatch(/Unmapped changes:\s+.*src\/worker\.ts/);
+    expect(output()).toMatch(/Originally selected test files:\s+src\/known\.test\.ts\s+Fallback test files:/);
+    expect(output()).toMatch(/Fallback test files:\s+src\/known\.test\.ts\s+src\/additional\.test\.ts/);
+    expect(output()).toContain('Vitest execution evidence: complete');
+    expect(output()).toContain(
+      'src/additional.test.ts [internal, spec-1]: passed (1 passed, 0 failed, 0 skipped, 0 pending)',
+    );
+    expect(output()).toContain('Vitest shutdown: completed');
+    expect(output()).toContain('Vitest subprocess exit: 0');
+    expect(output()).toContain('Vitest runner exit: 0');
+    expect(output()).not.toContain('Vitest reconciliation:');
+  });
+
+  it('reports the missing typecheck specification alongside a passing runtime observation for the same file', async () => {
+    const output = captureOutput();
+    const target = createTarget('full-target', { files: [knownTest] });
+    const identity = { file: knownTest, project: 'internal' };
+    const evidence: VitestExecutionEvidence = {
+      status: 'incomplete',
+      expected: [
+        { ...identity, id: 'runtime-id', kind: 'runtime' },
+        { ...identity, id: 'typecheck-id', kind: 'typecheck' },
+      ],
+      observed: [
+        {
+          ...identity,
+          id: 'runtime-id',
+          state: 'passed',
+          cases: { passed: 1, failed: 0, skipped: 0, pending: 0 },
+        },
+      ],
+      unhandledErrorCount: 0,
+      reconciliation: { missing: ['typecheck-id'], unexpected: [], duplicates: [], incomplete: [] },
+      unverifiedSpecifications: [],
+    };
+    const result = { exitCode: 0, termination: { exitCode: 0, signal: null }, evidence, shutdown: 'completed' };
+    target.runner.run.mockResolvedValue(result);
+
+    const status = await main(['run'], async () => [workerChange], { targets: [target] });
+
+    expect(status).toBe(1);
+    expect(target.runner.run).toHaveBeenCalledExactlyOnceWith([knownTest], process.cwd());
+    expect(output()).toContain('Vitest execution evidence: incomplete');
+    expect(output()).toContain('runtime-id]: passed (1 passed, 0 failed, 0 skipped, 0 pending)');
+    expect(output()).toMatch(
+      /Vitest reconciliation:\s+missing: src\/known\.test\.ts \[internal, typecheck, typecheck-id\]/,
+    );
+    expect(output()).not.toMatch(/\n\s+(unexpected|duplicates|incomplete|unverified):/);
+    expect(output()).toContain('Vitest subprocess exit: 0');
+    expect(output()).toContain('Vitest runner exit: 0');
+  });
+
+  it('keeps unreported termination distinct from a zero runner result', async () => {
+    const output = captureOutput();
+    const target = createTarget('full-target');
+
+    const status = await main(['run'], async () => [workerChange], { targets: [target] });
+
+    expect(status).toBe(1);
+    expect(target.runner.run).toHaveBeenCalledExactlyOnceWith(inventory, process.cwd());
+    expect(output()).toContain('Vitest execution evidence: incomplete (unavailable)');
+    expect(output()).toContain('Vitest shutdown: unverified');
+    expect(output()).toContain('Vitest subprocess termination: unavailable');
+    expect(output()).not.toContain('Vitest subprocess exit:');
+    expect(output()).toContain('Vitest runner exit: 0');
+  });
+
+  it('uses ordinary selection when the opted-in target has no detected mapping gap', async () => {
+    const output = captureOutput();
+    const target = createTarget('full-target', { selection: { selectedTests: [knownTest], unmappedChanges: [] } });
+
+    const status = await main(['run'], async () => [workerChange], { targets: [target] });
+
+    expect(status).toBe(0);
+    expect(target.runner.run).toHaveBeenCalledExactlyOnceWith([knownTest], process.cwd());
+    expect(output()).not.toContain('Full-target fallback');
+  });
+
+  it('preserves the ordinary config-change run without claiming fallback', async () => {
+    const output = captureOutput();
+    const target = createTarget('full-target');
+    const configChange: GitChange = { status: 'modified', path: 'forge.config.json' };
+
+    const status = await main(['run'], async () => [configChange], { targets: [target] });
+
+    expect(status).toBe(0);
+    expect(target.planSelection).not.toHaveBeenCalled();
+    expect(target.runner.run).toHaveBeenCalledExactlyOnceWith(inventory, process.cwd());
+    expect(output()).not.toContain('Full-target fallback');
+  });
+
+  it('refuses an unmatched change before executing an eligible target', async () => {
+    const output = captureOutput();
+    const target = createTarget('full-target');
+    const unmatched: GitChange = { status: 'modified', path: 'outside.ts' };
+
+    const status = await main(['run'], async () => [workerChange, unmatched], { targets: [target] });
+
+    expect(status).toBe(1);
+    expect(target.runner.run).not.toHaveBeenCalled();
+    expect(output()).toContain('Selection incomplete. Some changes have no validation target.');
+  });
+
+  it('refuses fallback before executing either affected target', async () => {
+    const output = captureOutput();
+    const target = createTarget('full-target');
+    const secondTarget = createTarget(undefined, {
+      id: 'internal.sibling',
+      root: 'sibling/',
+      selection: { selectedTests: ['sibling/known.test.ts'], unmappedChanges: [] },
+    });
+    const siblingChange: GitChange = { status: 'modified', path: 'sibling/source.ts' };
+
+    const status = await main(['run'], async () => [workerChange, siblingChange], { targets: [target, secondTarget] });
+
+    expect(status).toBe(1);
+    expect(target.runner.run).not.toHaveBeenCalled();
+    expect(secondTarget.runner.run).not.toHaveBeenCalled();
+    expect(output()).toContain('Full-target fallback refused: exactly one affected validation target is required.');
+  });
+
+  it('refuses a rename because fallback cannot establish the scope of both paths', async () => {
+    const output = captureOutput();
+    const renamed: GitChange = { status: 'renamed', previousPath: 'outside.ts', path: workerChange.path };
+    const target = createTarget('full-target', { selection: { selectedTests: [], unmappedChanges: [renamed] } });
+
+    const status = await main(['run'], async () => [renamed], { targets: [target] });
+
+    expect(status).toBe(1);
+    expect(target.runner.run).not.toHaveBeenCalled();
+    expect(output()).toContain('Full-target fallback refused: renames require a known scope for both paths.');
+  });
+
+  it('refuses an unsupported runner even if the target opted in', async () => {
+    const output = captureOutput();
+    const target = createTarget('full-target', { runnerId: 'maven' });
+
+    const status = await main(['run'], async () => [workerChange], { targets: [target] });
+
+    expect(status).toBe(1);
+    expect(target.runner.run).not.toHaveBeenCalled();
+    expect(output()).toContain('Full-target fallback refused: internal.forge-tests does not support fallback.');
+  });
+
+  it.each(['empty', 'unavailable'])('refuses a target with %s discovery', async (reason) => {
+    const output = captureOutput();
+    const target = createTarget('full-target', {
+      files: [],
+      selection: { selectedTests: [], unmappedChanges: [workerChange] },
+    });
+    if (reason === 'unavailable') target.discoverTestFiles.mockRejectedValue(new Error('Vitest discovery failed'));
+
+    const status = await main(['run'], async () => [workerChange], { targets: [target] });
+
+    expect(status).toBe(1);
+    expect(target.runner.run).not.toHaveBeenCalled();
+    expect(output()).toContain(
+      reason === 'empty'
+        ? 'Full-target fallback refused: internal.forge-tests has no discovered test files.'
+        : 'Vitest discovery failed',
+    );
   });
 });

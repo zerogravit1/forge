@@ -40,6 +40,7 @@ export function resolveTargetConfigs(config: ForgeConfig): ResolvedTargetConfig[
         testRoots: root.tests,
         adapters: target.adapter,
         runners: target.runner,
+        onUnmappedChanges: target.execution?.onUnmappedChanges ?? 'strict',
       });
     }
   }

@@ -4,6 +4,7 @@ import type { ValidationTarget } from './validation-target.js';
 
 export interface TargetPlan {
   target: ValidationTarget;
+  discoveredTests: string[];
   selection: SelectionResult;
 }
 
@@ -41,7 +42,7 @@ export async function planValidationTargets(
         }
       : await target.planSelection(targetChanges, testFiles, repoRoot);
 
-    plans.push({ target, selection });
+    plans.push({ target, discoveredTests: testFiles, selection });
   }
 
   return { plans, unmatchedChanges };

@@ -1,3 +1,5 @@
+export type UnmappedChangesPolicy = 'strict' | 'full-target';
+
 export interface ForgeConfig {
   version: string;
 
@@ -35,6 +37,9 @@ export interface ForgeConfig {
         root: string;
         adapter: string[];
         runner: string[];
+        execution?: {
+          onUnmappedChanges?: UnmappedChangesPolicy;
+        };
       }
     >
   >;
@@ -47,4 +52,5 @@ export interface ResolvedTargetConfig {
   testRoots: string[];
   adapters: string[];
   runners: string[];
+  onUnmappedChanges: UnmappedChangesPolicy;
 }

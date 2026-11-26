@@ -36,11 +36,17 @@ Dependency graphs are scoped to their originating test roots. This allows the sa
 
 When local imports, path aliases, or nonliteral dynamic imports cannot be resolved, Forge preserves that uncertainty rather than silently discarding the dependency. Node.js built-in modules and dependencies outside the repository are excluded from local dependency tracking.
 
-Subprocess entry points passed as file paths, such as Forge's Vitest worker, are outside the current import analysis. The `run` command blocks execution when the resulting selection has unmapped changes.
+Subprocess entry points passed as file paths, such as Forge's Vitest worker, are outside the current import analysis. By default, `run` blocks execution when the resulting selection has unmapped changes.
 
 **Validation:** Regression tests verify dependency selection, project isolation, and execution through Vitest, including propagation of failing assertions as nonzero validation results.
 
 See [#14 — TypeScript path alias resolution](https://github.com/zerogravit1/forge/issues/14) and [PR #23](https://github.com/zerogravit1/forge/pull/23) for implementation details and regression evidence.
+
+### Full-target fallback
+
+Set `"execution": { "onUnmappedChanges": "full-target" }` on a TypeScript/Vitest target in `forge.config.json` to allow `forge run` to attempt its full configured test inventory when the target has an unmapped change. Omitting the setting or choosing `strict` preserves strict refusal. The first implementation supports one affected target with a nonempty inventory. Unmatched changes and renames block fallback.
+
+Fallback uses the target's normal Vitest configuration, including skips. It reports the original mapping gap, requested scope, observed execution evidence, and subprocess status. Forge returns exit `1` after fallback because the original selection remains incomplete. A change to `forge.config.json` itself follows the existing configuration-change path, which selects the discovered inventory of each configured target.
 
 ## Current development status
 
